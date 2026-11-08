@@ -31,31 +31,40 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#16a34a'
 }
 
-# --- ESTILOS CSS FULL-WIDTH Y MOBILE-FIRST AVANZADOS ---
+# --- ESTILOS CSS FULL-WIDTH Y MOBILE-FIRST CORREGIDOS ---
 st.markdown(f"""
     <style>
     .main {{ 
         background-color: #f8fafc; 
     }}
+    
+    /* 1. SOLUCIÓN AL CORTE DE TÍTULOS: Espaciado superior seguro bajo la barra de Streamlit */
     .block-container {{
         max-width: 100% !important;
-        padding-top: 0.5rem !important;
-        padding-bottom: 4rem !important;
+        padding-top: 3.8rem !important; /* Espacio suficiente bajo el header superior */
+        padding-bottom: 3rem !important;
         padding-left: 1.2rem !important;
         padding-right: 1.2rem !important;
     }}
     
-    /* TÍTULO PRINCIPAL: Evita cortes con tipografía fluida y auto-wrap */
+    /* TÍTULO PRINCIPAL */
     .dashboard-title {{
-        font-size: clamp(1.2rem, 3.2vw, 2.2rem) !important;
+        font-size: clamp(1.3rem, 2.8vw, 2.2rem) !important;
         font-weight: 800;
         color: #0f172a;
-        line-height: 1.2;
+        line-height: 1.25;
+        margin-top: 5px;
         margin-bottom: 6px;
         word-wrap: break-word;
         overflow-wrap: break-word;
     }}
     
+    /* Encabezados de sección dentro de tabs para evitar cualquier solapamiento */
+    h3, .stTabs [data-baseweb="tab-panel"] h3 {{
+        margin-top: 15px !important;
+        padding-top: 5px !important;
+    }}
+
     /* CONTENEDOR GRID RESPONSIVO PARA KPIS */
     .kpi-grid {{
         display: grid;
@@ -134,7 +143,7 @@ st.markdown(f"""
         align-items: center;
         flex-wrap: wrap;
         gap: 6px;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
         color: #64748b;
         font-size: 12.5px;
         width: 100% !important;
@@ -153,31 +162,23 @@ st.markdown(f"""
     /* MEDIA QUERIES: VISTA VERTICAL EN CELULAR (PORTRAIT <= 768px) */
     @media (max-width: 768px) and (orientation: portrait) {{
         .block-container {{
+            padding-top: 3.2rem !important;
             padding-left: 0.5rem !important;
             padding-right: 0.5rem !important;
-            padding-top: 0.4rem !important;
         }}
-        /* Apilar en cuadrícula de 2 columnas */
         .kpi-grid {{
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 8px !important;
         }}
-        /* El 5to elemento se expande a las 2 columnas para simetría */
         .kpi-grid > div:nth-child(5) {{
             grid-column: span 2;
         }}
         .metric-card {{
             padding: 10px 12px;
         }}
-        .metric-title {{
-            font-size: 9.5px;
-        }}
-        .metric-value {{
-            font-size: 17px;
-        }}
-        .metric-sub {{
-            font-size: 10px;
-        }}
+        .metric-title {{ font-size: 9.5px; }}
+        .metric-value {{ font-size: 17px; }}
+        .metric-sub {{ font-size: 10px; }}
         .header-metadata {{
             flex-direction: column;
             align-items: flex-start;
@@ -188,10 +189,10 @@ st.markdown(f"""
     /* MEDIA QUERIES: VISTA HORIZONTAL EN CELULAR (LANDSCAPE <= 950px) */
     @media (max-width: 950px) and (orientation: landscape) {{
         .block-container {{
+            padding-top: 3.2rem !important;
             padding-left: 0.8rem !important;
             padding-right: 0.8rem !important;
         }}
-        /* 5 columnas ajustadas */
         .kpi-grid {{
             grid-template-columns: repeat(5, 1fr) !important;
             gap: 6px !important;
@@ -199,12 +200,8 @@ st.markdown(f"""
         .metric-card {{
             padding: 8px 10px;
         }}
-        .metric-value {{
-            font-size: 15px;
-        }}
-        .metric-title, .metric-sub {{
-            font-size: 9px;
-        }}
+        .metric-value {{ font-size: 15px; }}
+        .metric-title, .metric-sub {{ font-size: 9px; }}
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -292,7 +289,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- HEADER PRINCIPAL (Sin botón lateral para evitar recortes) ---
+# --- HEADER PRINCIPAL ---
 st.markdown('<div class="dashboard-title">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
 
 st.markdown(f"""
@@ -305,6 +302,38 @@ st.markdown(f"""
         </div>
     </div>
 """, unsafe_allow_html=True)
+
+# --- BOTÓN DE PANTALLA COMPLETA UBICADO DEBAJO DEL TÍTULO ---
+components.html("""
+    <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 6px;">
+        <button id="fs-btn" onclick="toggleFullScreen()" style="
+            background-color: #1b4332; color: #ffffff; border: none; border-radius: 7px;
+            padding: 7px 15px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex; align-items: center; gap: 7px;
+        ">
+            <span id="fs-icon">⛶</span> <span id="fs-text">Activar Pantalla Completa</span>
+        </button>
+    </div>
+    <script>
+        function toggleFullScreen() {
+            var doc = window.parent.document;
+            var btnText = document.getElementById("fs-text");
+            var btnIcon = document.getElementById("fs-icon");
+            if (!doc.fullscreenElement) {
+                doc.documentElement.requestFullscreen().catch(err => console.log(err));
+                btnText.innerText = "Salir de Pantalla Completa";
+                btnIcon.innerText = "🗗";
+            } else {
+                if (doc.exitFullscreen) {
+                    doc.exitFullscreen();
+                    btnText.innerText = "Activar Pantalla Completa";
+                    btnIcon.innerText = "⛶";
+                }
+            }
+        }
+    </script>
+""", height=40)
 
 st.caption("Análisis estratégico de ventas, pricing y benchmark mayorista frente al mercado de Palta Fuerte.")
 
@@ -346,7 +375,7 @@ if df.empty:
     st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
     st.stop()
 
-# --- KPIS GLOBALES CON GRID RESPONSIVE (5 Cols Desktop / 2 Cols Móvil) ---
+# --- KPIS GLOBALES CON GRID RESPONSIVE ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -961,7 +990,7 @@ with tab2:
         use_container_width=True, height=320, hide_index=True
     )
 
-# --- FOOTER INSTITUCIONAL CON BOTÓN DE PANTALLA COMPLETA ---
+# --- FOOTER INSTITUCIONAL ---
 st.markdown(f"""
     <div class="footer-credits">
         🥑 <b>KCO Group</b> — Plataforma de Inteligencia Comercial & Pricing &nbsp;|&nbsp; 
@@ -969,34 +998,3 @@ st.markdown(f"""
         <b>Última actualización:</b> {update_time}
     </div>
 """, unsafe_allow_html=True)
-
-# Botón de Pantalla Completa situado en la parte inferior
-components.html("""
-    <div style="display: flex; justify-content: center; align-items: center; padding-top: 10px;">
-        <button id="fs-btn" onclick="toggleFullScreen()" style="
-            background-color: #1b4332; color: #ffffff; border: none; border-radius: 8px;
-            padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15); font-family: sans-serif; display: flex; align-items: center; gap: 8px;
-        ">
-            <span id="fs-icon">⛶</span> <span id="fs-text">Activar Pantalla Completa</span>
-        </button>
-    </div>
-    <script>
-        function toggleFullScreen() {
-            var doc = window.parent.document;
-            var btnText = document.getElementById("fs-text");
-            var btnIcon = document.getElementById("fs-icon");
-            if (!doc.fullscreenElement) {
-                doc.documentElement.requestFullscreen().catch(err => console.log(err));
-                btnText.innerText = "Salir de Pantalla Completa";
-                btnIcon.innerText = "🗗";
-            } else {
-                if (doc.exitFullscreen) {
-                    doc.exitFullscreen();
-                    btnText.innerText = "Activar Pantalla Completa";
-                    btnIcon.innerText = "⛶";
-                }
-            }
-        }
-    </script>
-""", height=65)

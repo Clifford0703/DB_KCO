@@ -21,7 +21,7 @@ COLOR_SECONDARY = "#2d6a4f"
 COLOR_ACCENT = "#d97706"
 COLOR_NEUTRAL = "#0f172a"
 COLOR_INFO = "#0284c7"
-COLOR_MERCADO = "#64748b"  # Gris neutro pizarra para el mercado
+COLOR_MERCADO = "#64748b"
 
 VARIEDAD_COLORS = {
     'PALTA-FUERTE-A-KG': '#1b4332',
@@ -160,7 +160,6 @@ def style_semaphore(val):
 # --- CARGA Y TRANSFORMACIÓN DE DATOS ---
 @st.cache_data
 def load_all_data():
-    # 1. Carga de Órdenes de KCO
     file_path = "Ordenes.xls"
     try:
         xls = pd.ExcelFile(file_path, engine='xlrd')
@@ -190,7 +189,7 @@ def load_all_data():
     df['JABAS_EST'] = df['KILOS_SOLICITADOS'] / KG_PER_JABA
     df['PRECIO_FRUTO_EST'] = df['PRECIO_KG'] * df['PESO_FRUTO_KG']
     
-    # 2. Carga de Precios del Mercado Mayorista (reporte_fuerte.xls)
+    # Carga de Precios del Mercado Mayorista
     df_mercado = pd.DataFrame()
     mkt_file = "reporte_fuerte.xls"
     if os.path.exists(mkt_file):
@@ -291,7 +290,7 @@ with st.expander("🔍 **Filtros y Segmentación de Datos** (Toca aquí para aju
 col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
 label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
 
-# Filtrar data de órdenes
+# Filtrar data
 df = df_raw.copy()
 if len(date_range) == 2:
     df = df[(df['FECHA_EMISION'] >= pd.to_datetime(date_range[0])) & (df['FECHA_EMISION'] <= pd.to_datetime(date_range[1]))]
@@ -487,386 +486,46 @@ with tab1:
 # PESTAÑA 2: BENCHMARK MAYORISTA, PREVISIONES & PRICING
 # ==========================================================
 with tab2:
-    st.subheader("🎯 Benchmark: Precio KCO vs Mercado Mayorista & Previsión")
-    st.caption("Comparativo directo de Palta Fuerte KCO vs Mercado Mayorista (reporte_fuerte.xls) y proyección de cierre para este mes y el próximo.")
-    
-    # Preparamos la serie mensual de KCO Fuerte
-    df_fuerte = df_raw[df_raw['DESCRIPCION_PRODUCTO'].str.contains('FUERTE', case=False, na=False)].copy()
-    kco_monthly_fuerte = df_fuerte.groupby('MES_AÑO').agg(
-        KILOS=('KILOS_SOLICITADOS', 'sum'),
-        VALOR=('VALOR_COMERCIAL', 'sum')
-    ).reset_index()
-    kco_monthly_fuerte['PRECIO_KCO_FUERTE'] = kco_monthly_fuerte['VALOR'] / kco_monthly_fuerte['KILOS']
-    
-    # Serie mensual de Mercado
+    st.subheader("🎯 Comparativo Anual de Precios: Mayorista vs KCO Retail & Previsión")
+    st.caption("Evolución mensual (Ene - Dic): Comparativa multianual de mercado y precio ponderado de venta a cliente con proyección estacional a Diciembre.")
+
+    meses_nombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic']
+
     if not df_mercado_raw.empty:
-        mkt_monthly = df_mercado_raw.groupby('MES_AÑO')['Palta Fuerte'].mean().reset_index()
-        mkt_monthly.rename(columns={'Palta Fuerte': 'PRECIO_MERCADO'}, inplace=True)
+        # Extracción Mercado Mayorista
+        df_m = df_mercado_raw.copy()
+        df_m['AÑO'] = df_m['Fecha'].dt.year
+        df_m['MES'] = df_m['Fecha'].dt.month
         
-        # Merge histórico
-        df_comp = pd.merge(mkt_monthly[mkt_monthly['MES_AÑO'] >= '2026-02'], kco_monthly_fuerte, on='MES_AÑO', how='left')
+        mkt_mensual = df_m.groupby(['AÑO', 'MES'])['Palta Fuerte'].mean().unstack(level=0)
+        mkt_2025 = [mkt_mensual[2025].get(i, np.nan) if 2025 in mkt_mensual else np.nan for i in range(1, 13)]
+        mkt_2026_real = [mkt_mensual[2026].get(i, np.nan) if 2026 in mkt_mensual else np.nan for i in range(1, 13)]
         
-        # Previsión para este mes (2026-11) y el siguiente (2026-12)
-        # Noviembre 2026 en mercado (promedio observado + proyección fin de mes)
-        mkt_nov_val = df_mercado_raw[df_mercado_raw['MES_AÑO'] == '2026-11']['Palta Fuerte'].mean()
-        if pd.isna(mkt_nov_val):
-            mkt_nov_val = 8.65
-        else:
-            mkt_nov_val = round(float(mkt_nov_val), 2)
-            
-        # Estimación estacional Diciembre 2026
-        # Estacionalidad histórica: en dic 2025 cayó -20% frente a nov 2025
-        mkt_dic_pred = round(mkt_nov_val * 0.81, 2)  # ~6.95 S/
-        
-        # KCO histórico mantiene un spread promedio de S/ 2.74 o ~60% de margen retail
-        spread_promedio = (df_comp['PRECIO_KCO_FUERTE'] - df_comp['PRECIO_MERCADO']).dropna().mean()
-        if pd.isna(spread_promedio):
-            spread_promedio = 2.75
-            
-        kco_nov_pred = round(mkt_nov_val + spread_promedio, 2)      # ~11.40 S/
-        kco_dic_pred = round(mkt_dic_pred + (spread_promedio * 0.95), 2) # ~9.70 S/
-
-        # Dataframe unificado con previsiones
-        meses_hist = df_comp['MES_AÑO'].tolist()
-        mkt_hist = df_comp['PRECIO_MERCADO'].tolist()
-        kco_hist = df_comp['PRECIO_KCO_FUERTE'].tolist()
-        
-        # Gráfico comparativo y forecast
-        fig_bench = go.Figure()
-
-        # Línea de Mercado Mayorista Histórico
-        fig_bench.add_trace(go.Scatter(
-            x=meses_hist,
-            y=mkt_hist,
-            name='Mercado Mayorista (Histórico)',
-            mode='lines+markers',
-            line=dict(color=COLOR_MERCADO, width=2.5),
-            marker=dict(size=7),
-            hovertemplate="<b>Mes: %{x}</b><br>Mercado Mayorista: S/ %{y:.2f} /kg<extra></extra>"
-        ))
-
-        # Línea de KCO Palta Fuerte Histórico
-        fig_bench.add_trace(go.Scatter(
-            x=meses_hist,
-            y=kco_hist,
-            name='KCO Retail - Palta Fuerte (Ponderado)',
-            mode='lines+markers+text',
-            text=[f"S/{y:.2f}" if pd.notna(y) else "" for y in kco_hist],
-            textposition='top center',
-            textfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
-            line=dict(color=COLOR_PRIMARY, width=3.5),
-            marker=dict(size=8, color=COLOR_PRIMARY),
-            hovertemplate="<b>Mes: %{x}</b><br>KCO Precio Ponderado: S/ %{y:.2f} /kg<extra></extra>"
-        ))
-
-        # Puntos de Previsión (Noviembre 2026 y Diciembre 2026)
-        meses_forecast = ['2026-10', '2026-11 (Previsión)', '2026-12 (Previsión)']
-        mkt_last_val = mkt_hist[-2] if len(mkt_hist) >= 2 else 7.45
-        kco_last_val = kco_hist[-2] if len(kco_hist) >= 2 else 12.20
-        
-        fig_bench.add_trace(go.Scatter(
-            x=['2026-11 (Previsión)', '2026-12 (Previsión)'],
-            y=[mkt_nov_val, mkt_dic_pred],
-            name='Mercado Mayorista (Previsión)',
-            mode='lines+markers+text',
-            text=[f"S/{mkt_nov_val:.2f}", f"S/{mkt_dic_pred:.2f}"],
-            textposition='bottom center',
-            textfont=dict(color=COLOR_MERCADO, size=10, weight="bold"),
-            line=dict(color=COLOR_MERCADO, width=2, dash='dot'),
-            marker=dict(size=8, symbol='diamond')
-        ))
-
-        fig_bench.add_trace(go.Scatter(
-            x=['2026-11 (Previsión)', '2026-12 (Previsión)'],
-            y=[kco_nov_pred, kco_dic_pred],
-            name='KCO Retail (Cotización Sugerida)',
-            mode='lines+markers+text',
-            text=[f"S/{kco_nov_pred:.2f}", f"S/{kco_dic_pred:.2f}"],
-            textposition='top center',
-            textfont=dict(color=COLOR_ACCENT, size=11, family="Arial", weight="bold"),
-            line=dict(color=COLOR_ACCENT, width=3, dash='dash'),
-            marker=dict(size=9, color=COLOR_ACCENT, symbol='star')
-        ))
-
-        fig_bench.update_layout(
-            autosize=True,
-            template='plotly_white',
-            height=420,
-            xaxis=dict(title='Mes de Operación'),
-            yaxis=dict(title='Precio S/ por Kg', gridcolor='#f1f5f9'),
-            legend=dict(orientation="h", yanchor="bottom", y=1.03, xanchor="center", x=0.5),
-            margin=dict(t=45, b=25, l=10, r=10)
-        )
-        st.plotly_chart(fig_bench, use_container_width=True, config=PLOTLY_CONFIG)
-
-        # Resumen ejecutivo de previsión
-        prev_col1, prev_col2, prev_col3 = st.columns(3)
-        with prev_col1:
-            st.markdown(f"""
-                <div class="metric-card" style="border-left-color: {COLOR_MERCADO};">
-                    <div class="metric-title">Mercado Nov 2026 (Tendencia)</div>
-                    <div class="metric-value">S/ {mkt_nov_val:.2f} /kg</div>
-                    <div class="metric-sub">Pico estacional en mayorista</div>
-                </div>
-            """, unsafe_allow_html=True)
-        with prev_col2:
-            st.markdown(f"""
-                <div class="metric-card" style="border-left-color: {COLOR_ACCENT};">
-                    <div class="metric-title">KCO Sugerido Nov 2026</div>
-                    <div class="metric-value">S/ {kco_nov_pred:.2f} /kg</div>
-                    <div class="metric-sub">Cotización objetivo (Spread: +S/ {spread_promedio:.2f})</div>
-                </div>
-            """, unsafe_allow_html=True)
-        with prev_col3:
-            st.markdown(f"""
-                <div class="metric-card" style="border-left-color: #0284c7;">
-                    <div class="metric-title">KCO Proyectado Dic 2026</div>
-                    <div class="metric-value">S/ {kco_dic_pred:.2f} /kg</div>
-                    <div class="metric-sub">Ajuste por ingreso de nueva cosecha</div>
-                </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown(f"""
-        <div class="chart-insight">
-            💡 <b>Análisis Predictivo de Negociación:</b> 
-            Históricamente, KCO mantiene un <b>premium promedio de +{((spread_promedio/df_comp['PRECIO_MERCADO'].mean())*100):.1f}% (+S/ {spread_promedio:.2f}/kg)</b> 
-            sobre el mercado mayorista. Para <b>Noviembre 2026</b> el mercado mayorista se encuentra en zona de máximos (~S/ {mkt_nov_val:.2f}), lo que sustenta cotizaciones a retail entre <b>S/ {kco_nov_pred - 0.30:.2f} y S/ {kco_nov_pred + 0.30:.2f}</b>. 
-            Para <b>Diciembre 2026</b>, la estacionalidad de mayor oferta mayorista presionará los precios a la baja (~S/ {mkt_dic_pred:.2f}), proyectándose un rango de cotización de <b>S/ {kco_dic_pred - 0.25:.2f} a S/ {kco_dic_pred + 0.35:.2f}</b>.
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.info("Sube el archivo 'reporte_fuerte.xls' al repositorio para habilitar la previsión contra el mercado mayorista.")
-
-    st.markdown("---")
-
-    # --- AUDITORÍA DE VARIACIONES DE PRECIO Y LÍNEAS POR VARIEDAD ---
-    st.subheader("🔍 Auditoría de Variaciones de Precios por Producto")
-    st.caption(f"Evolución y variaciones porcentuales agrupadas por **{periodo_seleccionado.lower()}** para cada variedad.")
-    
-    df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(
-        KG=('KILOS_SOLICITADOS', 'sum'),
-        VALOR=('VALOR_COMERCIAL', 'sum')
-    ).reset_index()
-    df_prod_trend['PRECIO_POND'] = df_prod_trend['VALOR'] / df_prod_trend['KG']
-    df_prod_trend = df_prod_trend.sort_values(by=['DESCRIPCION_PRODUCTO', col_periodo])
-    
-    df_prod_trend['PRECIO_PREV'] = df_prod_trend.groupby('DESCRIPCION_PRODUCTO')['PRECIO_POND'].shift(1)
-    df_prod_trend['VAR_PRECIO_PCT'] = ((df_prod_trend['PRECIO_POND'] - df_prod_trend['PRECIO_PREV']) / df_prod_trend['PRECIO_PREV']) * 100
-    df_prod_trend['DIF_SOLES'] = df_prod_trend['PRECIO_POND'] - df_prod_trend['PRECIO_PREV']
-
-    df_changes = df_prod_trend[df_prod_trend['VAR_PRECIO_PCT'].notna() & (df_prod_trend['VAR_PRECIO_PCT'] != 0)].copy()
-
-    col_c1, col_c2 = st.columns([1.5, 1.5])
-    
-    with col_c1:
-        st.markdown(f"##### Variaciones Porcentuales de Precio ({periodo_seleccionado})")
-        if not df_changes.empty:
-            fig_var = px.bar(
-                df_changes.tail(20),
-                x=col_periodo,
-                y='VAR_PRECIO_PCT',
-                color='VAR_PRECIO_PCT',
-                text=df_changes.tail(20)['VAR_PRECIO_PCT'].apply(lambda x: f"{x:+.1f}%"),
-                color_continuous_scale='RdYlGn',
-                custom_data=['DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'KG']
-            )
-            fig_var.update_traces(
-                textposition='outside',
-                outsidetextfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
-                hovertemplate=(
-                    f"<b>{label_periodo}: %{{x}}</b><br>" +
-                    "🥑 <b>Producto: %{customdata[0]}</b><br>" +
-                    "🏷️ Precio Anterior: S/ %{customdata[1]:.2f} /kg<br>" +
-                    "🏷️ Precio Nuevo: S/ %{customdata[2]:.2f} /kg<br>" +
-                    "📊 Variación: <b>%{y:+.2f}%</b><br>" +
-                    "📦 Volumen: %{customdata[3]:,.0f} kg<extra></extra>"
-                )
-            )
-            fig_var.update_layout(
-                autosize=True,
-                template='plotly_white',
-                xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
-                yaxis=dict(title='Variación Porcentual (%)'),
-                height=400,
-                margin=dict(t=20, b=25, l=10, r=10)
-            )
-            st.plotly_chart(fig_var, use_container_width=True, config=PLOTLY_CONFIG)
-        else:
-            st.info("Sin variaciones registradas en el periodo.")
-
-    with col_c2:
-        st.markdown("##### Precios Ponderados por Variedad")
-        fig_line_prod = px.line(
-            df_prod_trend,
-            x=col_periodo,
-            y='PRECIO_POND',
-            color='DESCRIPCION_PRODUCTO',
-            markers=True,
-            color_discrete_map=VARIEDAD_COLORS
-        )
-        fig_line_prod.update_traces(
-            line=dict(width=2.8),
-            marker=dict(size=7),
-            hovertemplate=(
-                f"<b>{label_periodo}: %{{x}}</b><br>" +
-                "🥑 %{fullData.name}<br>" +
-                "🏷️ Precio Ponderado: <b>S/ %{y:.2f} /kg</b><extra></extra>"
-            )
-        )
-        fig_line_prod.update_layout(
-            autosize=True,
-            template='plotly_white',
-            xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
-            yaxis=dict(title='Precio S/ por Kg'),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.03,
-                xanchor="center",
-                x=0.5,
-                title_text=""
-            ),
-            height=400,
-            margin=dict(t=45, b=25, l=10, r=10)
-        )
-        st.plotly_chart(fig_line_prod, use_container_width=True, config=PLOTLY_CONFIG)
-
-    if not df_changes.empty:
-        with st.expander("Ver tabla completa de historial de cambios de precio"):
-            tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
-            tbl_c.columns = [label_periodo, 'Producto', 'Precio Anterior', 'Precio Actual', 'Diferencia S/', 'Variación %', 'Kilos del Periodo']
-            st.dataframe(
-                tbl_c.sort_values(by=label_periodo, ascending=False).style.format({
-                    'Precio Anterior': 'S/ {:.2f}',
-                    'Precio Actual': 'S/ {:.2f}',
-                    'Diferencia S/': 'S/ {:+.2f}',
-                    'Variación %': '{:+.2f}%',
-                    'Kilos del Periodo': '{:,.0f} kg'
-                })
-                .map(style_semaphore, subset=['Variación %', 'Diferencia S/']),
-                use_container_width=True, hide_index=True
-            )
-
-    st.markdown("---")
-
-    # --- BANDA DE NEGOCIACIÓN Y CONDICIONES COMERCIALES ---
-    col_v1, col_v2 = st.columns([1.5, 1])
-
-    with col_v1:
-        st.subheader("🎯 Banda de Negociación de Precios (Mín / Pond / Máx)")
-        st.caption("Rango efectivo de precios pactados por variedad en el periodo analizado.")
-        
-        df_banda = df.groupby('DESCRIPCION_PRODUCTO').agg(
-            PRECIO_MIN=('PRECIO_KG', 'min'),
-            PRECIO_MAX=('PRECIO_KG', 'max'),
+        # Extracción Precio Ponderado KCO
+        df_kco = df_raw.copy()
+        df_kco['MES'] = df_kco['FECHA_EMISION'].dt.month
+        kco_mensual = df_kco.groupby('MES').agg(
             KILOS=('KILOS_SOLICITADOS', 'sum'),
             VALOR=('VALOR_COMERCIAL', 'sum')
         ).reset_index()
-        df_banda['PRECIO_POND'] = df_banda['VALOR'] / df_banda['KILOS']
-        
-        fig_banda = go.Figure()
-        
-        fig_banda.add_trace(go.Bar(
-            name='Banda Min-Max',
-            x=df_banda['DESCRIPCION_PRODUCTO'],
-            y=df_banda['PRECIO_MAX'] - df_banda['PRECIO_MIN'],
-            base=df_banda['PRECIO_MIN'],
-            marker_color='rgba(45, 106, 79, 0.25)',
-            hovertemplate=(
-                "<b>%{x}</b><br>" +
-                "Piso: S/ %{base:.2f}<br>" +
-                "Techo: S/ %{customdata:.2f}<extra></extra>"
-            ),
-            customdata=df_banda['PRECIO_MAX']
-        ))
-        
-        fig_banda.add_trace(go.Scatter(
-            name='Precio Ponderado Real',
-            x=df_banda['DESCRIPCION_PRODUCTO'],
-            y=df_banda['PRECIO_POND'],
-            mode='markers+text',
-            text=df_banda['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
-            textposition='top center',
-            textfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
-            marker=dict(size=12, color=COLOR_ACCENT, symbol='diamond'),
-            hovertemplate="<b>%{x}</b><br>🏷️ Precio Ponderado: <b>S/ %{y:.2f} /kg</b><extra></extra>"
-        ))
-        
-        fig_banda.update_layout(
-            autosize=True,
-            template='plotly_white',
-            height=370,
-            showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-            yaxis_title="Precio (S/ por Kg)",
-            xaxis_title="Variedad",
-            margin=dict(t=35, b=25, l=10, r=10)
-        )
-        st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
+        kco_mensual['PRECIO_POND'] = kco_mensual['VALOR'] / kco_mensual['KILOS']
+        kco_dict = dict(zip(kco_mensual['MES'], kco_mensual['PRECIO_POND']))
+        kco_2026_real = [kco_dict.get(i, np.nan) for i in range(1, 13)]
 
-    with col_v2:
-        st.subheader("💳 Condiciones de Pago (Z015 vs Z045)")
-        st.caption("Impacto en días de crédito y rotación de cobro.")
+        # Previsión Diciembre 2026
+        # Estacionalidad Dic 2025 vs Nov 2025 (-20.1% por ingreso de cosecha temprana)
+        factor_estacional_dic = (mkt_2025[11] - mkt_2025[10]) / mkt_2025[10] if pd.notna(mkt_2025[10]) and pd.notna(mkt_2025[11]) else -0.20
+        mkt_nov_val = mkt_2026_real[10] if pd.notna(mkt_2026_real[10]) else 8.59
+        mkt_dic_pred = round(mkt_nov_val * (1 + factor_estacional_dic), 2)  # ~S/ 6.86
         
-        df_fp = df.groupby('FORMA_PAGO').agg(
-            ORDENES=('NRO_OC', 'nunique'),
-            KILOS=('KILOS_SOLICITADOS', 'sum'),
-            VALOR=('VALOR_COMERCIAL', 'sum')
-        ).reset_index()
-        df_fp['PART_VALOR'] = (df_fp['VALOR'] / df_fp['VALOR'].sum()) * 100
-        
-        hover_fp = [
-            f"<b>Condición {row['FORMA_PAGO']}</b><br><br>"
-            f"💰 <b>Monto:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
-            f"📦 <b>Kilos:</b> {row['KILOS']:,.0f} kg<br>"
-            f"📋 <b>Órdenes:</b> {row['ORDENES']:,} OCs"
-            for _, row in df_fp.iterrows()
-        ]
-        
-        fig_fp = go.Figure(data=[go.Pie(
-            labels=df_fp['FORMA_PAGO'],
-            values=df_fp['VALOR'],
-            hole=0.45,
-            marker=dict(colors=['#16a34a' if x == 'Z015' else '#d97706' for x in df_fp['FORMA_PAGO']]),
-            textposition='inside',
-            textinfo='percent+label',
-            insidetextfont=dict(color='#ffffff', size=11, family="Arial", weight="bold"),
-            hoverinfo='text',
-            hovertext=hover_fp
-        )])
-        
-        fig_fp.update_layout(
-            autosize=True,
-            template='plotly_white',
-            showlegend=False,
-            height=370,
-            margin=dict(t=25, b=20, l=10, r=10)
-        )
-        st.plotly_chart(fig_fp, use_container_width=True, config=PLOTLY_CONFIG)
+        kco_nov_val = kco_2026_real[10] if pd.notna(kco_2026_real[10]) else 11.00
+        spread_historico = np.nanmean(np.array(kco_2026_real[:11]) - np.array(mkt_2026_real[:11]))
+        if pd.isna(spread_historico):
+            spread_historico = 2.74
+            
+        kco_dic_pred = round(mkt_dic_pred + (spread_historico * 0.95), 2)  # ~S/ 9.45
 
-    # Detalle Operativo Final
-    st.markdown("---")
-    st.subheader("📋 Detalle de Órdenes & Estimaciones Logísticas")
-    cols_grid = ['NRO_OC', 'FECHA_EMISION', 'FORMA_PAGO', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PRECIO_KG', 'VALOR_COMERCIAL', 'JABAS_EST', 'FRUTOS_EST']
-    df_grid = df[cols_grid].copy()
-    df_grid['FECHA_EMISION'] = df_grid['FECHA_EMISION'].dt.strftime('%d-%m-%Y')
-    
-    st.dataframe(
-        df_grid.style.format({
-            'KILOS_SOLICITADOS': '{:,.0f} kg',
-            'PRECIO_KG': 'S/ {:.2f}',
-            'VALOR_COMERCIAL': 'S/ {:,.2f}',
-            'JABAS_EST': '{:,.1f}',
-            'FRUTOS_EST': '{:,.0f}'
-        }),
-        use_container_width=True, height=320, hide_index=True
-    )
-
-# --- FOOTER INSTITUCIONAL FULL-WIDTH ---
-st.markdown(f"""
-    <div class="footer-credits">
-        🥑 <b>KCO Group</b> — Plataforma de Inteligencia Comercial & Pricing &nbsp;|&nbsp; 
-        <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; 
-        <b>Última actualización:</b> {update_time}
-    </div>
-""", unsafe_allow_html=True)
+        # --- ETIQUETAS INTERCALADAS PARA MÁXIMA CLARIDAD ---
+        # Mercado: muestra meses impares + Noviembre
+        text_mkt_intercalado = []
+        for idx, val in enumerate(mkt_2026_real[:11]):

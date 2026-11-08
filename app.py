@@ -31,46 +31,80 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#16a34a'
 }
 
-# --- ESTILOS CSS FULL-WIDTH Y MOBILE-FIRST ---
+# --- ESTILOS CSS FULL-WIDTH Y MOBILE-FIRST AVANZADOS ---
 st.markdown(f"""
     <style>
-    .main {{ background-color: #f8fafc; }}
+    .main {{ 
+        background-color: #f8fafc; 
+    }}
     .block-container {{
         max-width: 100% !important;
-        padding-top: 0.8rem !important;
-        padding-bottom: 2rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 4rem !important;
+        padding-left: 1.2rem !important;
+        padding-right: 1.2rem !important;
     }}
+    
+    /* TÍTULO PRINCIPAL: Evita cortes con tipografía fluida y auto-wrap */
+    .dashboard-title {{
+        font-size: clamp(1.2rem, 3.2vw, 2.2rem) !important;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.2;
+        margin-bottom: 6px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }}
+    
+    /* CONTENEDOR GRID RESPONSIVO PARA KPIS */
+    .kpi-grid {{
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+        width: 100%;
+    }}
+    
     .metric-card {{
         background: #ffffff;
-        padding: 16px 18px;
+        padding: 14px 16px;
         border-radius: 10px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
         border-left: 5px solid {COLOR_PRIMARY};
-        margin-bottom: 12px;
-        width: 100% !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        box-sizing: border-box;
+        min-width: 0;
     }}
     .metric-title {{
         font-size: 11px;
         color: #64748b;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }}
     .metric-value {{
-        font-size: 23px;
+        font-size: clamp(17px, 1.8vw, 23px);
         color: {COLOR_NEUTRAL};
         font-weight: 800;
         margin-top: 4px;
         word-break: break-word;
+        line-height: 1.2;
     }}
     .metric-sub {{
         font-size: 11px;
         color: #94a3b8;
-        margin-top: 2px;
+        margin-top: 3px;
         font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }}
+    
     .chart-insight {{
         background-color: #f1f5f9;
         border-left: 4px solid {COLOR_PRIMARY};
@@ -83,26 +117,29 @@ st.markdown(f"""
         line-height: 1.45;
         width: 100% !important;
     }}
+    
     .filter-box {{
         background-color: #ffffff;
-        padding: 16px 20px;
+        padding: 14px 18px;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
         margin-bottom: 16px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
         width: 100% !important;
     }}
+    
     .header-metadata {{
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 8px;
+        gap: 6px;
+        margin-bottom: 12px;
         color: #64748b;
-        font-size: 13px;
+        font-size: 12.5px;
         width: 100% !important;
     }}
+    
     .footer-credits {{
         border-top: 1px solid #e2e8f0;
         padding-top: 16px;
@@ -112,21 +149,61 @@ st.markdown(f"""
         font-size: 11.5px;
         width: 100% !important;
     }}
-    @media (max-width: 768px) {{
+
+    /* MEDIA QUERIES: VISTA VERTICAL EN CELULAR (PORTRAIT <= 768px) */
+    @media (max-width: 768px) and (orientation: portrait) {{
         .block-container {{
-            padding-left: 0.6rem !important;
-            padding-right: 0.6rem !important;
-            padding-top: 0.6rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+            padding-top: 0.4rem !important;
+        }}
+        /* Apilar en cuadrícula de 2 columnas */
+        .kpi-grid {{
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+        }}
+        /* El 5to elemento se expande a las 2 columnas para simetría */
+        .kpi-grid > div:nth-child(5) {{
+            grid-column: span 2;
         }}
         .metric-card {{
-            padding: 12px 14px;
-            margin-bottom: 8px;
+            padding: 10px 12px;
         }}
-        .metric-value {{ font-size: 18px; }}
+        .metric-title {{
+            font-size: 9.5px;
+        }}
+        .metric-value {{
+            font-size: 17px;
+        }}
+        .metric-sub {{
+            font-size: 10px;
+        }}
         .header-metadata {{
             flex-direction: column;
             align-items: flex-start;
-            font-size: 11.5px;
+            font-size: 11px;
+        }}
+    }}
+
+    /* MEDIA QUERIES: VISTA HORIZONTAL EN CELULAR (LANDSCAPE <= 950px) */
+    @media (max-width: 950px) and (orientation: landscape) {{
+        .block-container {{
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
+        }}
+        /* 5 columnas ajustadas */
+        .kpi-grid {{
+            grid-template-columns: repeat(5, 1fr) !important;
+            gap: 6px !important;
+        }}
+        .metric-card {{
+            padding: 8px 10px;
+        }}
+        .metric-value {{
+            font-size: 15px;
+        }}
+        .metric-title, .metric-sub {{
+            font-size: 9px;
         }}
     }}
     </style>
@@ -189,7 +266,6 @@ def load_all_data():
     df['JABAS_EST'] = df['KILOS_SOLICITADOS'] / KG_PER_JABA
     df['PRECIO_FRUTO_EST'] = df['PRECIO_KG'] * df['PESO_FRUTO_KG']
     
-    # Carga de Precios del Mercado Mayorista
     df_mercado = pd.DataFrame()
     mkt_file = "reporte_fuerte.xls"
     if os.path.exists(mkt_file):
@@ -216,41 +292,8 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- HEADER CON BOTÓN FULLSCREEN ---
-head_col1, head_col2 = st.columns([4, 1])
-with head_col1:
-    st.markdown("## 🥑 KCO Group | Intelligence & Pricing Dashboard")
-
-with head_col2:
-    components.html("""
-        <div style="display: flex; justify-content: flex-end; align-items: center; height: 100%;">
-            <button id="fs-btn" onclick="toggleFullScreen()" style="
-                background-color: #1b4332; color: #ffffff; border: none; border-radius: 8px;
-                padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.15); font-family: sans-serif;
-            ">
-                <span id="fs-icon">⛶</span> <span id="fs-text">Pantalla Completa</span>
-            </button>
-        </div>
-        <script>
-            function toggleFullScreen() {
-                var doc = window.parent.document;
-                var btnText = document.getElementById("fs-text");
-                var btnIcon = document.getElementById("fs-icon");
-                if (!doc.fullscreenElement) {
-                    doc.documentElement.requestFullscreen().catch(err => console.log(err));
-                    btnText.innerText = "Salir Completa";
-                    btnIcon.innerText = "🗗";
-                } else {
-                    if (doc.exitFullscreen) {
-                        doc.exitFullscreen();
-                        btnText.innerText = "Pantalla Completa";
-                        btnIcon.innerText = "⛶";
-                    }
-                }
-            }
-        </script>
-    """, height=45)
+# --- HEADER PRINCIPAL (Sin botón lateral para evitar recortes) ---
+st.markdown('<div class="dashboard-title">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
 
 st.markdown(f"""
     <div class="header-metadata">
@@ -265,7 +308,7 @@ st.markdown(f"""
 
 st.caption("Análisis estratégico de ventas, pricing y benchmark mayorista frente al mercado de Palta Fuerte.")
 
-# --- FILTROS GLOBALES ---
+# --- FILTROS GLOBALES RESPONSIVE ---
 with st.expander("🔍 **Filtros y Segmentación de Datos** (Toca aquí para ajustar)", expanded=True):
     f_row1, f_row2 = st.columns([2.5, 1.5])
     with f_row1:
@@ -303,7 +346,7 @@ if df.empty:
     st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
     st.stop()
 
-# --- KPIS GLOBALES ---
+# --- KPIS GLOBALES CON GRID RESPONSIVE (5 Cols Desktop / 2 Cols Móvil) ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -311,17 +354,35 @@ total_ocs = df['NRO_OC'].nunique()
 kg_promedio_oc = total_kg / total_ocs if total_ocs > 0 else 0
 total_jabas_est = df['JABAS_EST'].sum()
 
-kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
-with kpi1:
-    st.markdown(f'<div class="metric-card"><div class="metric-title">Volumen Solicitado</div><div class="metric-value">{total_kg:,.0f} kg</div><div class="metric-sub">{total_kg/1000:,.1f} Tn solicitadas</div></div>', unsafe_allow_html=True)
-with kpi2:
-    st.markdown(f'<div class="metric-card" style="border-left-color: {COLOR_INFO};"><div class="metric-title">Facturación Total</div><div class="metric-value">S/ {valor_comercial_total:,.0f}</div><div class="metric-sub">Venta total bruta</div></div>', unsafe_allow_html=True)
-with kpi3:
-    st.markdown(f'<div class="metric-card" style="border-left-color: {COLOR_ACCENT};"><div class="metric-title">Precio Pond. General</div><div class="metric-value">S/ {precio_ponderado_total:.2f}</div><div class="metric-sub">Por kg promedio</div></div>', unsafe_allow_html=True)
-with kpi4:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #8b5cf6;"><div class="metric-title">Órdenes Únicas</div><div class="metric-value">{total_ocs:,}</div><div class="metric-sub">{kg_promedio_oc:,.0f} kg / orden</div></div>', unsafe_allow_html=True)
-with kpi5:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #059669;"><div class="metric-title">Jabas Estimadas</div><div class="metric-value">{total_jabas_est:,.0f}</div><div class="metric-sub">Factor 18 kg/jaba</div></div>', unsafe_allow_html=True)
+st.markdown(f"""
+    <div class="kpi-grid">
+        <div class="metric-card" style="border-left-color: {COLOR_PRIMARY};">
+            <div class="metric-title">Volumen Solicitado</div>
+            <div class="metric-value">{total_kg:,.0f} kg</div>
+            <div class="metric-sub">{total_kg/1000:,.1f} Tn solicitadas</div>
+        </div>
+        <div class="metric-card" style="border-left-color: {COLOR_INFO};">
+            <div class="metric-title">Facturación Total</div>
+            <div class="metric-value">S/ {valor_comercial_total:,.0f}</div>
+            <div class="metric-sub">Venta total bruta</div>
+        </div>
+        <div class="metric-card" style="border-left-color: {COLOR_ACCENT};">
+            <div class="metric-title">Precio Pond. General</div>
+            <div class="metric-value">S/ {precio_ponderado_total:.2f}</div>
+            <div class="metric-sub">Por kg promedio</div>
+        </div>
+        <div class="metric-card" style="border-left-color: #8b5cf6;">
+            <div class="metric-title">Órdenes Únicas</div>
+            <div class="metric-value">{total_ocs:,}</div>
+            <div class="metric-sub">{kg_promedio_oc:,.0f} kg / orden</div>
+        </div>
+        <div class="metric-card" style="border-left-color: #059669;">
+            <div class="metric-title">Jabas Estimadas</div>
+            <div class="metric-value">{total_jabas_est:,.0f}</div>
+            <div class="metric-sub">Factor 18 kg/jaba</div>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
 # --- NAVEGACIÓN EN 2 PESTAÑAS ---
 tab1, tab2 = st.tabs([
@@ -492,7 +553,6 @@ with tab2:
     meses_nombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic']
 
     if not df_mercado_raw.empty:
-        # Extracción Mercado Mayorista
         df_m = df_mercado_raw.copy()
         df_m['AÑO'] = df_m['Fecha'].dt.year
         df_m['MES'] = df_m['Fecha'].dt.month
@@ -501,7 +561,6 @@ with tab2:
         mkt_2025 = [mkt_mensual[2025].get(i, np.nan) if 2025 in mkt_mensual else np.nan for i in range(1, 13)]
         mkt_2026_real = [mkt_mensual[2026].get(i, np.nan) if 2026 in mkt_mensual else np.nan for i in range(1, 13)]
         
-        # Extracción Precio Ponderado KCO
         df_kco = df_raw.copy()
         df_kco['MES'] = df_kco['FECHA_EMISION'].dt.month
         kco_mensual = df_kco.groupby('MES').agg(
@@ -513,42 +572,38 @@ with tab2:
         kco_2026_real = [kco_dict.get(i, np.nan) for i in range(1, 13)]
 
         # Previsión Diciembre 2026
-        # Estacionalidad Dic 2025 vs Nov 2025 (-20.1% por ingreso de cosecha temprana)
         factor_estacional_dic = (mkt_2025[11] - mkt_2025[10]) / mkt_2025[10] if pd.notna(mkt_2025[10]) and pd.notna(mkt_2025[11]) else -0.20
         mkt_nov_val = mkt_2026_real[10] if pd.notna(mkt_2026_real[10]) else 8.59
-        mkt_dic_pred = round(mkt_nov_val * (1 + factor_estacional_dic), 2)  # ~S/ 6.86
+        mkt_dic_pred = round(mkt_nov_val * (1 + factor_estacional_dic), 2)
         
         kco_nov_val = kco_2026_real[10] if pd.notna(kco_2026_real[10]) else 11.00
         spread_historico = np.nanmean(np.array(kco_2026_real[:11]) - np.array(mkt_2026_real[:11]))
         if pd.isna(spread_historico):
             spread_historico = 2.74
             
-        kco_dic_pred = round(mkt_dic_pred + (spread_historico * 0.95), 2)  # ~S/ 9.45
+        kco_dic_pred = round(mkt_dic_pred + (spread_historico * 0.95), 2)
 
-        # --- ETIQUETAS INTERCALADAS PARA MÁXIMA CLARIDAD ---
-        # Mercado: muestra meses impares + Noviembre
+        # Etiquetas intercaladas
         text_mkt_intercalado = []
         for idx, val in enumerate(mkt_2026_real[:11]):
             mes_num = idx + 1
             if pd.isna(val):
                 text_mkt_intercalado.append("")
-            elif mes_num % 2 != 0 or mes_num == 11:  # Ene, Mar, May, Jul, Set, Nov
+            elif mes_num % 2 != 0 or mes_num == 11:
                 text_mkt_intercalado.append(f"S/{val:.2f}")
             else:
                 text_mkt_intercalado.append("")
 
-        # KCO: muestra meses pares + Noviembre
         text_kco_intercalado = []
         for idx, val in enumerate(kco_2026_real[:11]):
             mes_num = idx + 1
             if pd.isna(val):
                 text_kco_intercalado.append("")
-            elif mes_num % 2 == 0 or mes_num == 11:  # Feb, Abr, Jun, Ago, Oct, Nov
+            elif mes_num % 2 == 0 or mes_num == 11:
                 text_kco_intercalado.append(f"S/{val:.2f}")
             else:
                 text_kco_intercalado.append("")
 
-        # --- CONSTRUCCIÓN DEL GRÁFICO PLOTLY ---
         fig_anual = go.Figure()
 
         # A. Mercado Mayorista 2025
@@ -562,7 +617,7 @@ with tab2:
             hovertemplate="<b>%{x} (Mayorista 2025)</b><br>Precio: S/ %{y:.2f} /kg<extra></extra>"
         ))
 
-        # B. Mercado Mayorista 2026 (Real Ene - Nov)
+        # B. Mercado Mayorista 2026
         fig_anual.add_trace(go.Scatter(
             x=meses_nombres[:11],
             y=mkt_2026_real[:11],
@@ -590,7 +645,7 @@ with tab2:
             hovertemplate="<b>%{x} (Previsión Mercado)</b><br>Costo Estimado: S/ %{y:.2f} /kg<extra></extra>"
         ))
 
-        # D. KCO Retail - Venta Ponderada Real (Ene - Nov)
+        # D. KCO Retail Ponderado
         fig_anual.add_trace(go.Scatter(
             x=meses_nombres[:11],
             y=kco_2026_real[:11],
@@ -645,7 +700,6 @@ with tab2:
         )
         st.plotly_chart(fig_anual, use_container_width=True, config=PLOTLY_CONFIG)
 
-        # Resumen de previsión y sugerencia comercial
         c_prev1, c_prev2, c_prev3 = st.columns(3)
         with c_prev1:
             st.markdown(f"""
@@ -907,7 +961,7 @@ with tab2:
         use_container_width=True, height=320, hide_index=True
     )
 
-# --- FOOTER INSTITUCIONAL FULL-WIDTH ---
+# --- FOOTER INSTITUCIONAL CON BOTÓN DE PANTALLA COMPLETA ---
 st.markdown(f"""
     <div class="footer-credits">
         🥑 <b>KCO Group</b> — Plataforma de Inteligencia Comercial & Pricing &nbsp;|&nbsp; 
@@ -915,3 +969,34 @@ st.markdown(f"""
         <b>Última actualización:</b> {update_time}
     </div>
 """, unsafe_allow_html=True)
+
+# Botón de Pantalla Completa situado en la parte inferior
+components.html("""
+    <div style="display: flex; justify-content: center; align-items: center; padding-top: 10px;">
+        <button id="fs-btn" onclick="toggleFullScreen()" style="
+            background-color: #1b4332; color: #ffffff; border: none; border-radius: 8px;
+            padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15); font-family: sans-serif; display: flex; align-items: center; gap: 8px;
+        ">
+            <span id="fs-icon">⛶</span> <span id="fs-text">Activar Pantalla Completa</span>
+        </button>
+    </div>
+    <script>
+        function toggleFullScreen() {
+            var doc = window.parent.document;
+            var btnText = document.getElementById("fs-text");
+            var btnIcon = document.getElementById("fs-icon");
+            if (!doc.fullscreenElement) {
+                doc.documentElement.requestFullscreen().catch(err => console.log(err));
+                btnText.innerText = "Salir de Pantalla Completa";
+                btnIcon.innerText = "🗗";
+            } else {
+                if (doc.exitFullscreen) {
+                    doc.exitFullscreen();
+                    btnText.innerText = "Activar Pantalla Completa";
+                    btnIcon.innerText = "⛶";
+                }
+            }
+        }
+    </script>
+""", height=65)

@@ -18,11 +18,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Carga de datos directa y automática desde el archivo del repositorio (sin uploader)
+# Carga de datos robusta para archivos .xls / .xlsx
 @st.cache_data
 def load_data():
     file_path = "Ordenes.xls"
-    xls = pd.ExcelFile(file_path)
+    
+    # Intentar leer con xlrd para .xls antiguos o openpyxl para .xlsx
+    try:
+        xls = pd.ExcelFile(file_path, engine='xlrd')
+    except Exception:
+        try:
+            xls = pd.ExcelFile(file_path, engine='openpyxl')
+        except Exception:
+            xls = pd.ExcelFile(file_path) # Intento por defecto
+            
     sheet_name = xls.sheet_names[0]
     df = pd.read_excel(file_path, sheet_name=sheet_name)
     

@@ -5,9 +5,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 import os
+import json
+import base64
 from datetime import datetime
 
-# --- CONFIGURACIÓN DE PÁGINA ---
+# --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
     page_title="Inteligencia Comercial & Pricing | KCO Group",
     page_icon="🥑",
@@ -15,7 +17,53 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- PALETA CORPORATIVA DE ALTO CONTRASTE ---
+# --- 2. CONFIGURACIÓN PWA Y MANIFIESTO PARA PWABUILDER / MÓVIL ---
+pwa_manifest = {
+    "name": "KCO Group Intelligence & Pricing",
+    "short_name": "KCO Pricing",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#f8fafc",
+    "theme_color": "#1b4332",
+    "description": "Dashboard comercial y de pricing de palta para KCO Group",
+    "icons": [
+        {
+            "src": "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f951.png",
+            "sizes": "72x72",
+            "type": "image/png"
+        },
+        {
+            "src": "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f951.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f951.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
+
+manifest_json_str = json.dumps(pwa_manifest)
+manifest_b64 = base64.b64encode(manifest_json_str.encode('utf-8')).decode('utf-8')
+manifest_href = f"data:application/manifest+json;base64,{manifest_b64}"
+
+# Inyección en cabecera para PWA Standalone
+st.markdown(f"""
+    <head>
+        <link rel="manifest" href="{manifest_href}">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="KCO Pricing">
+        <meta name="theme-color" content="#1b4332">
+        <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f951.png">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    </head>
+""", unsafe_allow_html=True)
+
+# --- 3. PALETA CORPORATIVA ---
 COLOR_PRIMARY = "#1b4332"
 COLOR_SECONDARY = "#2d6a4f"
 COLOR_ACCENT = "#d97706"
@@ -31,23 +79,20 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#16a34a'
 }
 
-# --- ESTILOS CSS FULL-WIDTH Y MOBILE-FIRST CORREGIDOS ---
+# --- 4. ESTILOS CSS FULL-WIDTH Y MOBILE-FIRST ---
 st.markdown(f"""
     <style>
     .main {{ 
         background-color: #f8fafc; 
     }}
-    
-    /* 1. SOLUCIÓN AL CORTE DE TÍTULOS: Espaciado superior seguro bajo la barra de Streamlit */
     .block-container {{
         max-width: 100% !important;
-        padding-top: 3.8rem !important; /* Espacio suficiente bajo el header superior */
+        padding-top: 3.6rem !important;
         padding-bottom: 3rem !important;
         padding-left: 1.2rem !important;
         padding-right: 1.2rem !important;
     }}
     
-    /* TÍTULO PRINCIPAL */
     .dashboard-title {{
         font-size: clamp(1.3rem, 2.8vw, 2.2rem) !important;
         font-weight: 800;
@@ -59,13 +104,12 @@ st.markdown(f"""
         overflow-wrap: break-word;
     }}
     
-    /* Encabezados de sección dentro de tabs para evitar cualquier solapamiento */
-    h3, .stTabs [data-baseweb="tab-panel"] h3 {{
+    h3 {{
         margin-top: 15px !important;
         padding-top: 5px !important;
+        font-size: clamp(1.1rem, 2vw, 1.4rem) !important;
     }}
 
-    /* CONTENEDOR GRID RESPONSIVO PARA KPIS */
     .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -159,7 +203,34 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* MEDIA QUERIES: VISTA VERTICAL EN CELULAR (PORTRAIT <= 768px) */
+    div[data-testid="stRadio"] > div {{
+        background: #e2e8f0;
+        padding: 4px;
+        border-radius: 12px;
+        gap: 4px;
+    }}
+    div[data-testid="stRadio"] > div > label {{
+        flex: 1 1 0;
+        background: transparent;
+        padding: 10px 14px;
+        border-radius: 9px;
+        text-align: center;
+        font-weight: 700;
+        font-size: 13.5px;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin: 0 !important;
+    }}
+    div[data-testid="stRadio"] > div > label[data-checked="true"] {{
+        background: {COLOR_PRIMARY} !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+    }}
+    div[data-testid="stRadio"] > div > label[data-checked="true"] p {{
+        color: #ffffff !important;
+    }}
+
     @media (max-width: 768px) and (orientation: portrait) {{
         .block-container {{
             padding-top: 3.2rem !important;
@@ -186,7 +257,6 @@ st.markdown(f"""
         }}
     }}
 
-    /* MEDIA QUERIES: VISTA HORIZONTAL EN CELULAR (LANDSCAPE <= 950px) */
     @media (max-width: 950px) and (orientation: landscape) {{
         .block-container {{
             padding-top: 3.2rem !important;
@@ -211,7 +281,7 @@ PLOTLY_CONFIG = {
     'responsive': True
 }
 
-# --- MAESTRO DE PRODUCTOS ---
+# --- 5. MAESTRO DE PRODUCTOS ---
 PRODUCT_WEIGHTS = {
     'PALTA-FUERTE-A-KG': 0.250,
     'PALTA-FUERTE-V-KG': 0.280,
@@ -231,7 +301,7 @@ def style_semaphore(val):
     else:
         return 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'
 
-# --- CARGA Y TRANSFORMACIÓN DE DATOS ---
+# --- 6. CARGA Y TRANSFORMACIÓN DE DATOS ---
 @st.cache_data
 def load_all_data():
     file_path = "Ordenes.xls"
@@ -289,7 +359,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- HEADER PRINCIPAL ---
+# --- 7. HEADER PRINCIPAL ---
 st.markdown('<div class="dashboard-title">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
 
 st.markdown(f"""
@@ -303,12 +373,12 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- BOTÓN DE PANTALLA COMPLETA UBICADO DEBAJO DEL TÍTULO ---
+# --- BOTÓN DE PANTALLA COMPLETA ---
 components.html("""
-    <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 6px;">
+    <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 4px;">
         <button id="fs-btn" onclick="toggleFullScreen()" style="
-            background-color: #1b4332; color: #ffffff; border: none; border-radius: 7px;
-            padding: 7px 15px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+            background-color: #1b4332; color: #ffffff; border: none; border-radius: 8px;
+            padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
             box-shadow: 0 1px 3px rgba(0,0,0,0.12); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             display: flex; align-items: center; gap: 7px;
         ">
@@ -333,11 +403,11 @@ components.html("""
             }
         }
     </script>
-""", height=40)
+""", height=38)
 
 st.caption("Análisis estratégico de ventas, pricing y benchmark mayorista frente al mercado de Palta Fuerte.")
 
-# --- FILTROS GLOBALES RESPONSIVE ---
+# --- 8. FILTROS GLOBALES RESPONSIVE ---
 with st.expander("🔍 **Filtros y Segmentación de Datos** (Toca aquí para ajustar)", expanded=True):
     f_row1, f_row2 = st.columns([2.5, 1.5])
     with f_row1:
@@ -362,7 +432,7 @@ with st.expander("🔍 **Filtros y Segmentación de Datos** (Toca aquí para aju
 col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
 label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
 
-# Filtrar data
+# Filtrar datos
 df = df_raw.copy()
 if len(date_range) == 2:
     df = df[(df['FECHA_EMISION'] >= pd.to_datetime(date_range[0])) & (df['FECHA_EMISION'] <= pd.to_datetime(date_range[1]))]
@@ -375,7 +445,7 @@ if df.empty:
     st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
     st.stop()
 
-# --- KPIS GLOBALES CON GRID RESPONSIVE ---
+# --- 9. KPIS GLOBALES CON GRID RESPONSIVE ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -413,16 +483,20 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- NAVEGACIÓN EN 2 PESTAÑAS ---
-tab1, tab2 = st.tabs([
-    "📊 1. Resumen Ejecutivo & Evolución Periódica",
-    "📈 2. Benchmark de Mercado, Previsiones & Pricing"
-])
+# --- 10. NAVEGACIÓN MOBILE-FIRST CON CONTROL SEGMENTADO ---
+vista_activa = st.radio(
+    "Selecciona la vista a explorar:",
+    options=["📊 Resumen & Evolución", "🎯 Benchmark & Previsión"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
 
 # ==========================================================
-# PESTAÑA 1: RESUMEN EJECUTIVO & EVOLUCIÓN PERIÓDICA
+# VISTA 1: RESUMEN EJECUTIVO & EVOLUCIÓN PERIÓDICA
 # ==========================================================
-with tab1:
+if vista_activa == "📊 Resumen & Evolución":
     df_trend = df.groupby(col_periodo).agg(
         KG_TOTALES=('KILOS_SOLICITADOS', 'sum'),
         VALOR_TOTAL=('VALOR_COMERCIAL', 'sum'),
@@ -573,9 +647,9 @@ with tab1:
     )
 
 # ==========================================================
-# PESTAÑA 2: BENCHMARK MAYORISTA, PREVISIONES & PRICING
+# VISTA 2: BENCHMARK MAYORISTA, PREVISIONES & PRICING
 # ==========================================================
-with tab2:
+else:
     st.subheader("🎯 Comparativo Anual de Precios: Mayorista vs KCO Retail & Previsión")
     st.caption("Evolución mensual (Ene - Dic): Comparativa multianual de mercado y precio ponderado de venta a cliente con proyección estacional a Diciembre.")
 
@@ -990,7 +1064,7 @@ with tab2:
         use_container_width=True, height=320, hide_index=True
     )
 
-# --- FOOTER INSTITUCIONAL ---
+# --- 11. FOOTER INSTITUCIONAL ---
 st.markdown(f"""
     <div class="footer-credits">
         🥑 <b>KCO Group</b> — Plataforma de Inteligencia Comercial & Pricing &nbsp;|&nbsp; 

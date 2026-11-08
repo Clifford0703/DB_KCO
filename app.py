@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -28,22 +29,20 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#16a34a'
 }
 
-# --- ESTILOS CSS PARA FORZAR ANCHO MÁXIMO (100% FULL-WIDTH) ---
+# --- ESTILOS CSS FULL-WIDTH Y MOBILE-FIRST ---
 st.markdown(f"""
     <style>
-    /* 1. Forzar contenedor principal al ancho completo absoluto */
     .main {{ 
         background-color: #f8fafc; 
     }}
     .block-container {{
         max-width: 100% !important;
-        padding-top: 1rem !important;
+        padding-top: 0.8rem !important;
         padding-bottom: 2rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
     }}
     
-    /* 2. Tarjetas KPI al 100% del contenedor */
     .metric-card {{
         background: #ffffff;
         padding: 16px 18px;
@@ -74,7 +73,6 @@ st.markdown(f"""
         font-weight: 500;
     }}
     
-    /* 3. Cuadros de insights informativos */
     .chart-insight {{
         background-color: #f1f5f9;
         border-left: 4px solid {COLOR_PRIMARY};
@@ -88,7 +86,6 @@ st.markdown(f"""
         width: 100% !important;
     }}
     
-    /* 4. Caja de Filtros Full-Width */
     .filter-box {{
         background-color: #ffffff;
         padding: 16px 20px;
@@ -99,14 +96,13 @@ st.markdown(f"""
         width: 100% !important;
     }}
     
-    /* 5. Header y Footer responsive */
     .header-metadata {{
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
         gap: 8px;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
         color: #64748b;
         font-size: 13px;
         width: 100% !important;
@@ -121,12 +117,11 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* 6. Optimización en Celulares (Mobile <= 768px) */
     @media (max-width: 768px) {{
         .block-container {{
             padding-left: 0.6rem !important;
             padding-right: 0.6rem !important;
-            padding-top: 0.8rem !important;
+            padding-top: 0.6rem !important;
         }}
         .metric-card {{
             padding: 12px 14px;
@@ -150,7 +145,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# Configuración Plotly Responsive y sin toolbar intrusivo
+# Configuración Plotly Responsive sin barra molesta
 PLOTLY_CONFIG = {
     'displayModeBar': False,
     'responsive': True
@@ -221,8 +216,55 @@ except Exception as e:
     st.error(f"Error cargando archivo de datos: {e}")
     st.stop()
 
-# --- HEADER PRINCIPAL ---
-st.markdown("## 🥑 KCO Group | Intelligence & Pricing Dashboard")
+# --- HEADER PRINCIPAL CON BOTÓN DE PANTALLA COMPLETA ---
+head_col1, head_col2 = st.columns([4, 1])
+
+with head_col1:
+    st.markdown("## 🥑 KCO Group | Intelligence & Pricing Dashboard")
+
+with head_col2:
+    # Componente nativo HTML/JS para alternar Fullscreen
+    components.html("""
+        <div style="display: flex; justify-content: flex-end; align-items: center; height: 100%;">
+            <button id="fs-btn" onclick="toggleFullScreen()" style="
+                background-color: #1b4332;
+                color: #ffffff;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 14px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            ">
+                <span id="fs-icon">⛶</span> <span id="fs-text">Pantalla Completa</span>
+            </button>
+        </div>
+        <script>
+            function toggleFullScreen() {
+                var doc = window.parent.document;
+                var btnText = document.getElementById("fs-text");
+                var btnIcon = document.getElementById("fs-icon");
+                if (!doc.fullscreenElement) {
+                    doc.documentElement.requestFullscreen().catch(err => {
+                        console.log("Error al activar pantalla completa: " + err.message);
+                    });
+                    btnText.innerText = "Salir Completa";
+                    btnIcon.innerText = "🗗";
+                } else {
+                    if (doc.exitFullscreen) {
+                        doc.exitFullscreen();
+                        btnText.innerText = "Pantalla Completa";
+                        btnIcon.innerText = "⛶";
+                    }
+                }
+            }
+        </script>
+    """, height=45)
 
 st.markdown(f"""
     <div class="header-metadata">
@@ -324,6 +366,7 @@ with tab1:
         st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
         fig_dual = go.Figure()
 
+        # Barras con texto externo nítido y de alto contraste
         fig_dual.add_trace(go.Bar(
             x=df_trend[col_periodo],
             y=df_trend['TN_TOTALES'],
@@ -331,6 +374,7 @@ with tab1:
             marker_color=COLOR_SECONDARY,
             text=df_trend['TN_TOTALES'].apply(lambda x: f"{x:,.1f} Tn"),
             textposition='outside',
+            outsidetextfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
             hovertemplate=(
                 f"<b>{label_periodo}: %{{x}}</b><br>" +
                 "📦 Volumen: %{y:.2f} Tn (%{customdata[0]:,.0f} kg)<br>" +
@@ -341,6 +385,7 @@ with tab1:
             yaxis='y'
         ))
 
+        # Línea de Precio Ponderado con texto visible
         fig_dual.add_trace(go.Scatter(
             x=df_trend[col_periodo],
             y=df_trend['PRECIO_POND'],
@@ -348,6 +393,7 @@ with tab1:
             mode='lines+markers+text',
             text=df_trend['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
             textposition='top center',
+            textfont=dict(color='#b45309', size=11, family="Arial", weight="bold"),
             marker=dict(size=8, color=COLOR_ACCENT),
             line=dict(width=3, color=COLOR_ACCENT),
             hovertemplate=(
@@ -409,6 +455,7 @@ with tab1:
             marker=dict(colors=pie_colors),
             textposition='inside',
             textinfo='percent+label',
+            insidetextfont=dict(color='#ffffff', size=11, family="Arial", weight="bold"),
             hoverinfo='text',
             hovertext=hover_texts
         )])
@@ -486,8 +533,10 @@ with tab2:
                 color_continuous_scale='RdYlGn',
                 custom_data=['DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'KG']
             )
+            # Etiquetas de alto contraste fuera de la barra
             fig_var.update_traces(
                 textposition='outside',
+                outsidetextfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
                 hovertemplate=(
                     f"<b>{label_periodo}: %{{x}}</b><br>" +
                     "🥑 <b>Producto: %{customdata[0]}</b><br>" +
@@ -596,7 +645,7 @@ with tab2:
             customdata=df_banda['PRECIO_MAX']
         ))
         
-        # Marcador de Precio Ponderado Real
+        # Marcador de Precio Ponderado Real con texto visible oscuro
         fig_banda.add_trace(go.Scatter(
             name='Precio Ponderado Real',
             x=df_banda['DESCRIPCION_PRODUCTO'],
@@ -604,6 +653,7 @@ with tab2:
             mode='markers+text',
             text=df_banda['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
             textposition='top center',
+            textfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
             marker=dict(size=12, color=COLOR_ACCENT, symbol='diamond'),
             hovertemplate="<b>%{x}</b><br>🏷️ Precio Ponderado: <b>S/ %{y:.2f} /kg</b><extra></extra>"
         ))
@@ -646,6 +696,7 @@ with tab2:
             marker=dict(colors=['#16a34a' if x == 'Z015' else '#d97706' for x in df_fp['FORMA_PAGO']]),
             textposition='inside',
             textinfo='percent+label',
+            insidetextfont=dict(color='#ffffff', size=11, family="Arial", weight="bold"),
             hoverinfo='text',
             hovertext=hover_fp
         )])

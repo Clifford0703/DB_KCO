@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 # ==============================================================================
-# 1. CONFIGURACIÓN DE PÁGINA Y ESTILO (MODO CLARO FORZADO)
+# 1. CONFIGURACIÓN DE PÁGINA Y ESTILO
 # ==============================================================================
 st.set_page_config(
     page_title="Control Pricing & Volumen - InRetail 2026",
@@ -19,11 +19,6 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Forzar fondo claro y textos legibles */
-    .stApp {
-        background-color: #FFFFFF;
-        color: #1A202C;
-    }
     .reportview-container .main .block-container {
         padding-top: 1.2rem;
         padding-bottom: 2rem;
@@ -39,13 +34,6 @@ st.markdown("""
         color: #4A5568;
         margin-bottom: 16px;
     }
-    /* Estilo de tarjetas métricas */
-    div[data-testid="metric-container"] {
-        background-color: #F8FAFC;
-        border: 1px solid #E2E8F0;
-        padding: 12px 16px;
-        border-radius: 8px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,7 +41,7 @@ st.markdown('<div class="main-title">🥑 Control Maestro de Pricing, Volumen y 
 st.markdown('<div class="sub-title">Carga directa desde GitHub | Curvas de volumen (Kg, Tn), Precios Ponderados, Auditoría de OCs y Simulador de Descuento.</div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. CARGA AUTOMÁTICA DEL ARCHIVO (CON DETECCIÓN DE 30 COLUMNAS)
+# 2. CARGA AUTOMÁTICA DE ARCHIVOS (GITHUB / LOCAL / UPLOAD)
 # ==============================================================================
 @st.cache_data
 def load_data(uploaded_file=None):
@@ -68,15 +56,12 @@ def load_data(uploaded_file=None):
                 df = pd.read_excel(uploaded_file)
             file_used = uploaded_file.name
         except Exception as e:
-            st.error(f"Error al leer archivo subido: {e}")
+            st.error(f"Error al procesar archivo: {e}")
             return pd.DataFrame(), ""
     else:
-        # Busca automáticamente en la raíz del repositorio de GitHub
         candidates = glob.glob("*.xls") + glob.glob("*.xlsx") + glob.glob("*.csv")
-        # Excluir temporales de Excel
-        candidates = [c for c in candidates if not os.path.basename(c).startswith("~$")]
+        candidates = [c for c in candidates if not c.startswith("~$") and "Analisis_Comercial" not in c]
         
-        # Priorizar archivo de órdenes de compra
         priority = sorted(candidates, key=lambda x: (
             0 if "Ordenes" in x or "ordenes" in x else 1,
             -os.path.getmtime(x) if os.path.exists(x) else 0
@@ -97,7 +82,6 @@ def load_data(uploaded_file=None):
     if df is None or df.empty:
         return pd.DataFrame(), ""
 
-    # Mapeo y normalización para el archivo en bruto de 30 columnas
     col_map = {
         'PRECIO_FINAL_CON_IMP': 'PRECIO_KG',
         'PRECIO_FINAL_NETO': 'PRECIO_KG',
@@ -109,7 +93,6 @@ def load_data(uploaded_file=None):
     }
     df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
 
-    # Tratamiento de fechas
     if 'FECHA_EMISION' in df.columns:
         df['FECHA_EMISION_DT'] = pd.to_datetime(df['FECHA_EMISION'], format='%d-%m-%Y', errors='coerce')
         if df['FECHA_EMISION_DT'].isna().all():
@@ -125,14 +108,17 @@ def load_data(uploaded_file=None):
     if 'KG_POR_JABA' not in df.columns:
         df['KG_POR_JABA'] = 18
 
-    # Variables operativas y comerciales calculadas
     df['MES'] = df['FECHA_EMISION_DT'].dt.strftime('%Y-%m')
     df['SEMANA'] = df['FECHA_EMISION_DT'].dt.isocalendar().week.astype(int)
     df['TOTAL_KG'] = df['UNIDADES_SOLICITADAS'] * df['KG_POR_JABA']
     df['TONELADAS'] = df['TOTAL_KG'] / 1000.0
+
+    if 'PRECIO_KG' not in df.columns:
+        # Fallback if neither PRECIO_FINAL_CON_IMP nor PRECIO_FINAL_NETO is present
+        df['PRECIO_KG'] = 0.0
+
     df['VENTA_SOLES'] = df['TOTAL_KG'] * df['PRECIO_KG']
 
-    # Condición de pago
     if 'FORMA_PAGO' not in df.columns or df['FORMA_PAGO'].isna().all():
         df['FORMA_PAGO'] = np.where(df['MES'].isin(['2026-02', '2026-03']), 'Z015', 'Z045')
     else:
@@ -146,44 +132,39 @@ def load_data(uploaded_file=None):
     return df, file_used
 
 # ==============================================================================
-# 3. BARRA LATERAL (ORIGEN + FILTROS DINÁMICOS)
+# 3. SIDEBAR: FILTROS DINÁMICOS Y CONECTADOS
 # ==============================================================================
 with st.sidebar:
-    st.header("📂 Origen de Datos")
+    st.header("📂 Origen de Datos en GitHub")
     uploaded_file = st.file_uploader(
-        "Subir otro archivo (opcional):",
+        "Actualizar con archivo nuevo (opcional):",
         type=["xls", "xlsx", "csv"],
-        help="El sistema lee automáticamente el archivo .xls de tu repositorio. Usa esto solo si tienes un archivo nuevo no subido a GitHub."
+        help="Si no subes nada, el sistema lee automáticamente el archivo del repositorio de GitHub."
     )
     df_raw, source_name = load_data(uploaded_file)
 
     if df_raw.empty:
-        st.error("No se encontró ningún archivo en el repositorio. Sube un archivo para comenzar.")
+        st.error("No se detectó ningún archivo en el repositorio. Sube un archivo de órdenes para inicializar.")
         st.stop()
 
-    st.success(f"Archivo cargado: `{os.path.basename(source_name)}`\n\nTotal filas: **{len(df_raw)}**")
+    st.success(f"Archivo activo: `{source_name}` ({len(df_raw)} órdenes)")
 
     st.divider()
     st.header("🔍 Filtros Dinámicos")
 
-    # 1. Filtro de Mes
     meses_disp = sorted(df_raw['MES'].unique())
     sel_meses = st.multiselect("📅 Filtrar por Mes:", options=meses_disp, default=meses_disp)
 
-    # 2. Filtro de Semana (dependiente de los meses elegidos)
     df_f_mes = df_raw[df_raw['MES'].isin(sel_meses)] if sel_meses else df_raw
     semanas_disp = sorted(df_f_mes['SEMANA'].unique())
     sel_semanas = st.multiselect("🗓️ Filtrar por Semana Nº:", options=semanas_disp, default=semanas_disp)
 
-    # 3. Filtro de Producto / SKU
     prods_disp = sorted(df_raw['DESCRIPCION_PRODUCTO'].unique())
     sel_prods = st.multiselect("🥑 Filtrar por Producto (Calibre):", options=prods_disp, default=prods_disp)
 
-    # 4. Filtro de Condición de Pago
     pagos_disp = sorted(df_raw['FORMA_PAGO'].unique())
     sel_pagos = st.multiselect("💳 Condición de Pago:", options=pagos_disp, default=pagos_disp)
 
-# Aplicación de los filtros
 df = df_raw[
     (df_raw['MES'].isin(sel_meses)) &
     (df_raw['SEMANA'].isin(sel_semanas)) &
@@ -192,11 +173,11 @@ df = df_raw[
 ].copy()
 
 if df.empty:
-    st.warning("No hay órdenes que coincidan con la combinación de filtros seleccionada.")
+    st.warning("No hay órdenes que coincidan con los filtros seleccionados.")
     st.stop()
 
 # ==============================================================================
-# 4. TARJETAS KPI RESUMEN EJECUTIVO
+# 4. TARJETAS KPI RESUMEN
 # ==============================================================================
 total_tn = df['TONELADAS'].sum()
 total_kg = df['TOTAL_KG'].sum()
@@ -216,7 +197,7 @@ c5.metric("Órdenes <100 jabas", f"{ocs_criticas} OCs", f"{(ocs_criticas/len(df)
 st.divider()
 
 # ==============================================================================
-# 5. PESTAÑAS PRINCIPALES DEL DASHBOARD
+# 5. PESTAÑAS DEL DASHBOARD
 # ==============================================================================
 tab_vol, tab_precios, tab_ocs, tab_simulador, tab_datos = st.tabs([
     "📊 1. Curvas de Volumen & Ventas (Kg, Tn, S/)",
@@ -523,7 +504,7 @@ with tab_datos:
     cols_existentes = [c for c in cols_mostrar if c in df.columns]
 
     st.dataframe(
-        df[cols_existentes].sort_values('FECHA_EMISION_DT', ascending=False).style.format({
+        df[cols_existentes].sort_values('FECHAN_EMISION_DT' if 'FECHAN_EMISION_DT' in df.columns else 'FECHA_EMISION_DT', ascending=False).style.format({
             'UNIDADES_SOLICITADAS': '{:,.0f}',
             'TOTAL_KG': '{:,.0f} kg',
             'TONELADAS': '{:,.2f} Tn',

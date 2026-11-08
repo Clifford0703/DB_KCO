@@ -28,13 +28,22 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#16a34a'
 }
 
-# --- ESTILOS CSS RESPONSIVE & MOBILE-FIRST ---
+# --- ESTILOS CSS PARA FORZAR ANCHO MÁXIMO (100% FULL-WIDTH) ---
 st.markdown(f"""
     <style>
-    /* Estilos generales */
-    .main {{ background-color: #f8fafc; }}
+    /* 1. Forzar contenedor principal al ancho completo absoluto */
+    .main {{ 
+        background-color: #f8fafc; 
+    }}
+    .block-container {{
+        max-width: 100% !important;
+        padding-top: 1rem !important;
+        padding-bottom: 2rem !important;
+        padding-left: 1.5rem !important;
+        padding-right: 1.5rem !important;
+    }}
     
-    /* Contenedor métrico base (Escritorio) */
+    /* 2. Tarjetas KPI al 100% del contenedor */
     .metric-card {{
         background: #ffffff;
         padding: 16px 18px;
@@ -42,7 +51,7 @@ st.markdown(f"""
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
         border-left: 5px solid {COLOR_PRIMARY};
         margin-bottom: 12px;
-        width: 100%;
+        width: 100% !important;
     }}
     .metric-title {{
         font-size: 11px;
@@ -52,7 +61,7 @@ st.markdown(f"""
         letter-spacing: 0.5px;
     }}
     .metric-value {{
-        font-size: 22px;
+        font-size: 23px;
         color: {COLOR_NEUTRAL};
         font-weight: 800;
         margin-top: 4px;
@@ -65,7 +74,7 @@ st.markdown(f"""
         font-weight: 500;
     }}
     
-    /* Contenedores de texto explicativo */
+    /* 3. Cuadros de insights informativos */
     .chart-insight {{
         background-color: #f1f5f9;
         border-left: 4px solid {COLOR_PRIMARY};
@@ -76,9 +85,10 @@ st.markdown(f"""
         margin-top: 8px;
         margin-bottom: 16px;
         line-height: 1.45;
+        width: 100% !important;
     }}
     
-    /* Caja de Filtros */
+    /* 4. Caja de Filtros Full-Width */
     .filter-box {{
         background-color: #ffffff;
         padding: 16px 20px;
@@ -86,9 +96,10 @@ st.markdown(f"""
         border: 1px solid #e2e8f0;
         margin-bottom: 16px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        width: 100% !important;
     }}
     
-    /* Header Metadata */
+    /* 5. Header y Footer responsive */
     .header-metadata {{
         display: flex;
         justify-content: space-between;
@@ -98,8 +109,8 @@ st.markdown(f"""
         margin-bottom: 12px;
         color: #64748b;
         font-size: 13px;
+        width: 100% !important;
     }}
-    
     .footer-credits {{
         border-top: 1px solid #e2e8f0;
         padding-top: 16px;
@@ -107,10 +118,16 @@ st.markdown(f"""
         text-align: center;
         color: #64748b;
         font-size: 11.5px;
+        width: 100% !important;
     }}
 
-    /* MEDIA QUERIES PARA DISPOSITIVOS MÓVILES (PANTALLAS <= 768px) */
+    /* 6. Optimización en Celulares (Mobile <= 768px) */
     @media (max-width: 768px) {{
+        .block-container {{
+            padding-left: 0.6rem !important;
+            padding-right: 0.6rem !important;
+            padding-top: 0.8rem !important;
+        }}
         .metric-card {{
             padding: 12px 14px;
             margin-bottom: 8px;
@@ -121,9 +138,6 @@ st.markdown(f"""
         .metric-value {{
             font-size: 18px;
         }}
-        .metric-sub {{
-            font-size: 10px;
-        }}
         .header-metadata {{
             flex-direction: column;
             align-items: flex-start;
@@ -132,19 +146,13 @@ st.markdown(f"""
         .filter-box {{
             padding: 12px 14px;
         }}
-        h2 {{
-            font-size: 20px !important;
-        }}
-        h3, h4, h5 {{
-            font-size: 16px !important;
-        }}
     }}
     </style>
 """, unsafe_allow_html=True)
 
-# Configuración responsive estándar para gráficos Plotly
+# Configuración Plotly Responsive y sin toolbar intrusivo
 PLOTLY_CONFIG = {
-    'displayModeBar': False,  # Oculta barra de herramientas en móviles para no estorbar
+    'displayModeBar': False,
     'responsive': True
 }
 
@@ -184,12 +192,12 @@ def load_data():
     df = pd.read_excel(file_path, sheet_name=xls.sheet_names[0])
     df = df.loc[:, ~df.columns.duplicated()]
 
-    # Fechas y Agrupaciones
+    # Fechas y agrupaciones
     df['FECHA_EMISION'] = pd.to_datetime(df['FECHA_EMISION'], format='%d-%m-%Y', errors='coerce')
     df['MES_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-%m')
     df['SEMANA_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-W%V')
     
-    # Estandarización de variables comerciales
+    # Estandarización de variables
     df['KILOS_SOLICITADOS'] = df['UNIDADES_SOLICITADAS'].fillna(0)
     df['PRECIO_KG'] = df['PRECIO_FINAL_NETO'].fillna(0)
     df['VALOR_COMERCIAL'] = df['KILOS_SOLICITADOS'] * df['PRECIO_KG']
@@ -229,7 +237,7 @@ st.markdown(f"""
 
 st.caption("Análisis estratégico de ventas y pricing en canal Retail: Tendencias periódicas, monitoreo de precios y auditoría operativa.")
 
-# --- SEGMENTACIÓN SUPERIOR RESPONSIVE ---
+# --- SEGMENTACIÓN SUPERIOR FULL-WIDTH ---
 with st.expander("🔍 **Filtros y Segmentación de Datos** (Toca aquí para ajustar)", expanded=True):
     f_row1, f_row2 = st.columns([2.5, 1.5])
     
@@ -268,7 +276,7 @@ if df.empty:
     st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
     st.stop()
 
-# --- KPIS GLOBALES RESPONSIVE ---
+# --- KPIS GLOBALES FULL-WIDTH ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -276,7 +284,6 @@ total_ocs = df['NRO_OC'].nunique()
 kg_promedio_oc = total_kg / total_ocs if total_ocs > 0 else 0
 total_jabas_est = df['JABAS_EST'].sum()
 
-# En móvil Streamlit ajusta las 5 columnas a 2 o 1 automáticamente
 kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
 with kpi1:
     st.markdown(f'<div class="metric-card"><div class="metric-title">Volumen Solicitado</div><div class="metric-value">{total_kg:,.0f} kg</div><div class="metric-sub">{total_kg/1000:,.1f} Tn solicitadas</div></div>', unsafe_allow_html=True)
@@ -311,7 +318,7 @@ with tab1:
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    col_g1, col_g2 = st.columns([1.55, 1])
+    col_g1, col_g2 = st.columns([1.6, 1])
 
     with col_g1:
         st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
@@ -357,8 +364,8 @@ with tab1:
             yaxis2=dict(title='Precio Pond. (S/ /kg)', overlaying='y', side='right', showgrid=True),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             template='plotly_white',
-            height=390,
-            margin=dict(t=35, b=25, l=5, r=5)
+            height=400,
+            margin=dict(t=35, b=25, l=10, r=10)
         )
         st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
         
@@ -410,8 +417,8 @@ with tab1:
             autosize=True,
             template='plotly_white',
             showlegend=False,
-            height=390,
-            margin=dict(t=25, b=20, l=5, r=5)
+            height=400,
+            margin=dict(t=25, b=20, l=10, r=10)
         )
         st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
         
@@ -495,8 +502,8 @@ with tab2:
                 template='plotly_white',
                 xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
                 yaxis=dict(title='Variación Porcentual (%)'),
-                height=390,
-                margin=dict(t=20, b=25, l=5, r=5)
+                height=400,
+                margin=dict(t=20, b=25, l=10, r=10)
             )
             st.plotly_chart(fig_var, use_container_width=True, config=PLOTLY_CONFIG)
         else:
@@ -534,8 +541,8 @@ with tab2:
                 x=0.5,
                 title_text=""
             ),
-            height=390,
-            margin=dict(t=45, b=25, l=5, r=5)
+            height=400,
+            margin=dict(t=45, b=25, l=10, r=10)
         )
         st.plotly_chart(fig_line_prod, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -558,7 +565,7 @@ with tab2:
     st.markdown("---")
 
     # --- BANDA DE NEGOCIACIÓN Y CONDICIONES COMERCIALES ---
-    col_v1, col_v2 = st.columns([1.4, 1])
+    col_v1, col_v2 = st.columns([1.5, 1])
 
     with col_v1:
         st.subheader("🎯 Banda de Negociación de Precios (Mín / Pond / Máx)")
@@ -604,12 +611,12 @@ with tab2:
         fig_banda.update_layout(
             autosize=True,
             template='plotly_white',
-            height=360,
+            height=370,
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
             yaxis_title="Precio (S/ por Kg)",
             xaxis_title="Variedad",
-            margin=dict(t=35, b=25, l=5, r=5)
+            margin=dict(t=35, b=25, l=10, r=10)
         )
         st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -647,8 +654,8 @@ with tab2:
             autosize=True,
             template='plotly_white',
             showlegend=False,
-            height=360,
-            margin=dict(t=25, b=20, l=5, r=5)
+            height=370,
+            margin=dict(t=25, b=20, l=10, r=10)
         )
         st.plotly_chart(fig_fp, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -678,7 +685,7 @@ with tab2:
         use_container_width=True, height=320, hide_index=True
     )
 
-# --- FOOTER INSTITUCIONAL ---
+# --- FOOTER INSTITUCIONAL FULL-WIDTH ---
 st.markdown(f"""
     <div class="footer-credits">
         🥑 <b>KCO Group</b> — Plataforma de Inteligencia Comercial & Pricing &nbsp;|&nbsp; 

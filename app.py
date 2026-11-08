@@ -21,83 +21,132 @@ COLOR_NEUTRAL = "#0f172a"
 COLOR_INFO = "#0284c7"
 
 VARIEDAD_COLORS = {
-    'PALTA-FUERTE-A-KG': '#1b4332',  # Verde bosque
-    'PALTA-FUERTE-V-KG': '#0284c7',  # Azul zafiro
-    'PALTA-FUERTE-P-KG': '#d97706',  # Ámbar tostado
-    'PALTA-FUERTE-C-KG': '#7c3aed',  # Púrpura intenso
-    'PALTA-M-KG':        '#16a34a'   # Verde esmeralda
+    'PALTA-FUERTE-A-KG': '#1b4332',
+    'PALTA-FUERTE-V-KG': '#0284c7',
+    'PALTA-FUERTE-P-KG': '#d97706',
+    'PALTA-FUERTE-C-KG': '#7c3aed',
+    'PALTA-M-KG':        '#16a34a'
 }
-DEFAULT_PALETTE = list(VARIEDAD_COLORS.values())
 
-# --- ESTILOS CSS UI/UX ---
+# --- ESTILOS CSS RESPONSIVE & MOBILE-FIRST ---
 st.markdown(f"""
     <style>
+    /* Estilos generales */
     .main {{ background-color: #f8fafc; }}
     
+    /* Contenedor métrico base (Escritorio) */
     .metric-card {{
         background: #ffffff;
-        padding: 18px 22px;
-        border-radius: 12px;
+        padding: 16px 18px;
+        border-radius: 10px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
         border-left: 5px solid {COLOR_PRIMARY};
-        margin-bottom: 14px;
+        margin-bottom: 12px;
+        width: 100%;
     }}
     .metric-title {{
         font-size: 11px;
         color: #64748b;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.6px;
+        letter-spacing: 0.5px;
     }}
     .metric-value {{
-        font-size: 24px;
+        font-size: 22px;
         color: {COLOR_NEUTRAL};
         font-weight: 800;
         margin-top: 4px;
+        word-break: break-word;
     }}
     .metric-sub {{
-        font-size: 11.5px;
+        font-size: 11px;
         color: #94a3b8;
-        margin-top: 3px;
+        margin-top: 2px;
         font-weight: 500;
     }}
+    
+    /* Contenedores de texto explicativo */
     .chart-insight {{
         background-color: #f1f5f9;
         border-left: 4px solid {COLOR_PRIMARY};
         padding: 10px 14px;
         border-radius: 6px;
-        font-size: 12.5px;
+        font-size: 12px;
         color: #334155;
-        margin-top: 10px;
-        margin-bottom: 18px;
+        margin-top: 8px;
+        margin-bottom: 16px;
         line-height: 1.45;
     }}
+    
+    /* Caja de Filtros */
     .filter-box {{
         background-color: #ffffff;
-        padding: 18px 22px;
+        padding: 16px 20px;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
-        margin-bottom: 18px;
+        margin-bottom: 16px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }}
-    .footer-credits {{
-        border-top: 1px solid #e2e8f0;
-        padding-top: 15px;
-        margin-top: 35px;
-        text-align: center;
-        color: #64748b;
-        font-size: 12px;
-    }}
+    
+    /* Header Metadata */
     .header-metadata {{
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
         color: #64748b;
         font-size: 13px;
     }}
+    
+    .footer-credits {{
+        border-top: 1px solid #e2e8f0;
+        padding-top: 16px;
+        margin-top: 30px;
+        text-align: center;
+        color: #64748b;
+        font-size: 11.5px;
+    }}
+
+    /* MEDIA QUERIES PARA DISPOSITIVOS MÓVILES (PANTALLAS <= 768px) */
+    @media (max-width: 768px) {{
+        .metric-card {{
+            padding: 12px 14px;
+            margin-bottom: 8px;
+        }}
+        .metric-title {{
+            font-size: 10px;
+        }}
+        .metric-value {{
+            font-size: 18px;
+        }}
+        .metric-sub {{
+            font-size: 10px;
+        }}
+        .header-metadata {{
+            flex-direction: column;
+            align-items: flex-start;
+            font-size: 11.5px;
+        }}
+        .filter-box {{
+            padding: 12px 14px;
+        }}
+        h2 {{
+            font-size: 20px !important;
+        }}
+        h3, h4, h5 {{
+            font-size: 16px !important;
+        }}
+    }}
     </style>
 """, unsafe_allow_html=True)
+
+# Configuración responsive estándar para gráficos Plotly
+PLOTLY_CONFIG = {
+    'displayModeBar': False,  # Oculta barra de herramientas en móviles para no estorbar
+    'responsive': True
+}
 
 # --- MAESTRO DE PRODUCTOS ---
 PRODUCT_WEIGHTS = {
@@ -155,9 +204,7 @@ def load_data():
     df['JABAS_EST'] = df['KILOS_SOLICITADOS'] / KG_PER_JABA
     df['PRECIO_FRUTO_EST'] = df['PRECIO_KG'] * df['PESO_FRUTO_KG']
     
-    # Timestamp de ingesta de datos
     timestamp_actualizacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    
     return df, timestamp_actualizacion
 
 try:
@@ -169,7 +216,6 @@ except Exception as e:
 # --- HEADER PRINCIPAL ---
 st.markdown("## 🥑 KCO Group | Intelligence & Pricing Dashboard")
 
-# Bloque con metadata de desarrollo y actualización
 st.markdown(f"""
     <div class="header-metadata">
         <div>
@@ -181,33 +227,30 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-st.markdown("Análisis estratégico de ventas y pricing en canal Retail: Tendencias periódicas, monitoreo de precios y auditoría operativa.")
+st.caption("Análisis estratégico de ventas y pricing en canal Retail: Tendencias periódicas, monitoreo de precios y auditoría operativa.")
 
-# --- SEGMENTACIÓN SUPERIOR ---
-st.markdown('<div class="filter-box">', unsafe_allow_html=True)
-f_row1, f_row2 = st.columns([3, 1])
-
-with f_row1:
-    st.markdown("##### 🔍 Segmentación de Información")
-    f1, f2, f3 = st.columns(3)
-    with f1:
-        min_date, max_date = df_raw['FECHA_EMISION'].min(), df_raw['FECHA_EMISION'].max()
-        date_range = st.date_input("Periodo Histórico", value=(min_date, max_date), min_value=min_date, max_value=max_date)
-    with f2:
-        prods = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
-        selected_prods = st.multiselect("Variedad / Calibre", options=prods, default=prods)
-    with f3:
-        formas_pago = sorted(df_raw['FORMA_PAGO'].dropna().unique().tolist())
-        selected_fp = st.multiselect("Condición de Pago", options=formas_pago, default=formas_pago)
-
-with f_row2:
-    st.markdown("##### ⏱️ Agrupación Temporal")
-    periodo_seleccionado = st.radio(
-        "Ver gráficos agrupados por:",
-        options=["Mensual", "Semanal"],
-        horizontal=True
-    )
-st.markdown('</div>', unsafe_allow_html=True)
+# --- SEGMENTACIÓN SUPERIOR RESPONSIVE ---
+with st.expander("🔍 **Filtros y Segmentación de Datos** (Toca aquí para ajustar)", expanded=True):
+    f_row1, f_row2 = st.columns([2.5, 1.5])
+    
+    with f_row1:
+        f1, f2, f3 = st.columns(3)
+        with f1:
+            min_date, max_date = df_raw['FECHA_EMISION'].min(), df_raw['FECHA_EMISION'].max()
+            date_range = st.date_input("Periodo Histórico", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+        with f2:
+            prods = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
+            selected_prods = st.multiselect("Variedad / Calibre", options=prods, default=prods)
+        with f3:
+            formas_pago = sorted(df_raw['FORMA_PAGO'].dropna().unique().tolist())
+            selected_fp = st.multiselect("Condición de Pago", options=formas_pago, default=formas_pago)
+            
+    with f_row2:
+        periodo_seleccionado = st.radio(
+            "Agrupación Temporal:",
+            options=["Mensual", "Semanal"],
+            horizontal=True
+        )
 
 col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
 label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
@@ -225,7 +268,7 @@ if df.empty:
     st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
     st.stop()
 
-# --- KPIS GLOBALES ---
+# --- KPIS GLOBALES RESPONSIVE ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -233,6 +276,7 @@ total_ocs = df['NRO_OC'].nunique()
 kg_promedio_oc = total_kg / total_ocs if total_ocs > 0 else 0
 total_jabas_est = df['JABAS_EST'].sum()
 
+# En móvil Streamlit ajusta las 5 columnas a 2 o 1 automáticamente
 kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
 with kpi1:
     st.markdown(f'<div class="metric-card"><div class="metric-title">Volumen Solicitado</div><div class="metric-value">{total_kg:,.0f} kg</div><div class="metric-sub">{total_kg/1000:,.1f} Tn solicitadas</div></div>', unsafe_allow_html=True)
@@ -307,23 +351,24 @@ with tab1:
         ))
 
         fig_dual.update_layout(
+            autosize=True,
             xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
-            yaxis=dict(title='Volumen Total (Toneladas)', showgrid=False),
-            yaxis2=dict(title='Precio Ponderado (S/ por Kg)', overlaying='y', side='right', showgrid=True),
+            yaxis=dict(title='Volumen Total (Tn)', showgrid=False),
+            yaxis2=dict(title='Precio Pond. (S/ /kg)', overlaying='y', side='right', showgrid=True),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             template='plotly_white',
-            height=410,
-            margin=dict(t=30, b=20, l=10, r=10)
+            height=390,
+            margin=dict(t=35, b=25, l=5, r=5)
         )
-        st.plotly_chart(fig_dual, use_container_width=True)
+        st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
         
         max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
         max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
         st.markdown(f"""
         <div class="chart-insight">
             💡 <b>Insight Comercial ({periodo_seleccionado}):</b> 
-            El pico de volumen se registró en <b>{max_vol_row[col_periodo]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Toneladas</b> ({max_vol_row['ORDENES']} OCs). 
-            El mayor precio ponderado de venta se alcanzó en <b>{max_p_row[col_periodo]}</b> a <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b>.
+            El pico de volumen se registró en <b>{max_vol_row[col_periodo]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs). 
+            El mayor precio ponderado se alcanzó en <b>{max_p_row[col_periodo]}</b> a <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b>.
         </div>
         """, unsafe_allow_html=True)
 
@@ -362,17 +407,18 @@ with tab1:
         )])
         
         fig_pie.update_layout(
+            autosize=True,
             template='plotly_white',
             showlegend=False,
-            height=410,
-            margin=dict(t=30, b=20, l=10, r=10)
+            height=390,
+            margin=dict(t=25, b=20, l=5, r=5)
         )
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
         
         top_prod = df_prod.iloc[0]
         st.markdown(f"""
         <div class="chart-insight">
-            📌 <b>Concentración de Portafolio:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{top_prod['PART_VALOR']:.1f}%</b> de la facturación en el periodo filtrado (S/ {top_prod['VALOR']:,.0f}).
+            📌 <b>Concentración de Portafolio:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{top_prod['PART_VALOR']:.1f}%</b> de la facturación (S/ {top_prod['VALOR']:,.0f}).
         </div>
         """, unsafe_allow_html=True)
 
@@ -404,7 +450,7 @@ with tab1:
 # ==========================================================
 with tab2:
     st.subheader("🔍 Auditoría de Variaciones de Precios por Producto")
-    st.markdown(f"Evolución y variaciones porcentuales agrupadas por **{periodo_seleccionado.lower()}** para cada variedad.")
+    st.caption(f"Evolución y variaciones porcentuales agrupadas por **{periodo_seleccionado.lower()}** para cada variedad.")
     
     df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(
         KG=('KILOS_SOLICITADOS', 'sum'),
@@ -425,11 +471,11 @@ with tab2:
         st.markdown(f"##### Variaciones Porcentuales de Precio ({periodo_seleccionado})")
         if not df_changes.empty:
             fig_var = px.bar(
-                df_changes.tail(25),
+                df_changes.tail(20),
                 x=col_periodo,
                 y='VAR_PRECIO_PCT',
                 color='VAR_PRECIO_PCT',
-                text=df_changes.tail(25)['VAR_PRECIO_PCT'].apply(lambda x: f"{x:+.1f}%"),
+                text=df_changes.tail(20)['VAR_PRECIO_PCT'].apply(lambda x: f"{x:+.1f}%"),
                 color_continuous_scale='RdYlGn',
                 custom_data=['DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'KG']
             )
@@ -441,17 +487,18 @@ with tab2:
                     "🏷️ Precio Anterior: S/ %{customdata[1]:.2f} /kg<br>" +
                     "🏷️ Precio Nuevo: S/ %{customdata[2]:.2f} /kg<br>" +
                     "📊 Variación: <b>%{y:+.2f}%</b><br>" +
-                    "📦 Volumen del Periodo: %{customdata[3]:,.0f} kg<extra></extra>"
+                    "📦 Volumen: %{customdata[3]:,.0f} kg<extra></extra>"
                 )
             )
             fig_var.update_layout(
+                autosize=True,
                 template='plotly_white',
                 xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
                 yaxis=dict(title='Variación Porcentual (%)'),
-                height=440,
-                margin=dict(t=20, b=20, l=10, r=10)
+                height=390,
+                margin=dict(t=20, b=25, l=5, r=5)
             )
-            st.plotly_chart(fig_var, use_container_width=True)
+            st.plotly_chart(fig_var, use_container_width=True, config=PLOTLY_CONFIG)
         else:
             st.info("Sin variaciones registradas en el periodo.")
 
@@ -475,6 +522,7 @@ with tab2:
             )
         )
         fig_line_prod.update_layout(
+            autosize=True,
             template='plotly_white',
             xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
             yaxis=dict(title='Precio S/ por Kg'),
@@ -486,26 +534,26 @@ with tab2:
                 x=0.5,
                 title_text=""
             ),
-            height=440,
-            margin=dict(t=50, b=20, l=10, r=10)
+            height=390,
+            margin=dict(t=45, b=25, l=5, r=5)
         )
-        st.plotly_chart(fig_line_prod, use_container_width=True)
+        st.plotly_chart(fig_line_prod, use_container_width=True, config=PLOTLY_CONFIG)
 
     if not df_changes.empty:
-        st.markdown("##### Matriz Detallada de Cambios de Precio")
-        tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
-        tbl_c.columns = [label_periodo, 'Producto', 'Precio Anterior', 'Precio Actual', 'Diferencia S/', 'Variación %', 'Kilos del Periodo']
-        st.dataframe(
-            tbl_c.sort_values(by=label_periodo, ascending=False).style.format({
-                'Precio Anterior': 'S/ {:.2f}',
-                'Precio Actual': 'S/ {:.2f}',
-                'Diferencia S/': 'S/ {:+.2f}',
-                'Variación %': '{:+.2f}%',
-                'Kilos del Periodo': '{:,.0f} kg'
-            })
-            .map(style_semaphore, subset=['Variación %', 'Diferencia S/']),
-            use_container_width=True, hide_index=True
-        )
+        with st.expander("Ver tabla completa de historial de cambios de precio"):
+            tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
+            tbl_c.columns = [label_periodo, 'Producto', 'Precio Anterior', 'Precio Actual', 'Diferencia S/', 'Variación %', 'Kilos del Periodo']
+            st.dataframe(
+                tbl_c.sort_values(by=label_periodo, ascending=False).style.format({
+                    'Precio Anterior': 'S/ {:.2f}',
+                    'Precio Actual': 'S/ {:.2f}',
+                    'Diferencia S/': 'S/ {:+.2f}',
+                    'Variación %': '{:+.2f}%',
+                    'Kilos del Periodo': '{:,.0f} kg'
+                })
+                .map(style_semaphore, subset=['Variación %', 'Diferencia S/']),
+                use_container_width=True, hide_index=True
+            )
 
     st.markdown("---")
 
@@ -513,8 +561,8 @@ with tab2:
     col_v1, col_v2 = st.columns([1.4, 1])
 
     with col_v1:
-        st.subheader("🎯 Banda de Negociación de Precios (Mínimo, Ponderado y Máximo)")
-        st.markdown("Rango efectivo de precios pactados por variedad en el periodo analizado.")
+        st.subheader("🎯 Banda de Negociación de Precios (Mín / Pond / Máx)")
+        st.caption("Rango efectivo de precios pactados por variedad en el periodo analizado.")
         
         df_banda = df.groupby('DESCRIPCION_PRODUCTO').agg(
             PRECIO_MIN=('PRECIO_KG', 'min'),
@@ -554,19 +602,20 @@ with tab2:
         ))
         
         fig_banda.update_layout(
+            autosize=True,
             template='plotly_white',
-            height=370,
+            height=360,
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
             yaxis_title="Precio (S/ por Kg)",
             xaxis_title="Variedad",
-            margin=dict(t=40, b=20, l=10, r=10)
+            margin=dict(t=35, b=25, l=5, r=5)
         )
-        st.plotly_chart(fig_banda, use_container_width=True)
+        st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
 
     with col_v2:
         st.subheader("💳 Condiciones de Pago (Z015 vs Z045)")
-        st.markdown("Impacto en días de crédito y rotación de cobro.")
+        st.caption("Impacto en días de crédito y rotación de cobro.")
         
         df_fp = df.groupby('FORMA_PAGO').agg(
             ORDENES=('NRO_OC', 'nunique'),
@@ -595,16 +644,17 @@ with tab2:
         )])
         
         fig_fp.update_layout(
+            autosize=True,
             template='plotly_white',
             showlegend=False,
-            height=370,
-            margin=dict(t=40, b=20, l=10, r=10)
+            height=360,
+            margin=dict(t=25, b=20, l=5, r=5)
         )
-        st.plotly_chart(fig_fp, use_container_width=True)
+        st.plotly_chart(fig_fp, use_container_width=True, config=PLOTLY_CONFIG)
 
     st.markdown("""
     <div class="chart-insight">
-        📌 <b>Diagnóstico Financiero de Negociación:</b> 
+        📌 <b>Diagnóstico Financiero:</b> 
         El cliente migró sus órdenes de compra al plazo <b>Z045 (45 días)</b> a partir de abril, absorbiendo más del 95% de la facturación anual. 
         En la banda de precios, variedades como <b>PALTA-M-KG</b> y <b>PALTA-FUERTE-V-KG</b> exhiben mayor amplitud de negociación (techo superior a S/ 12.00 en temporada baja).
     </div>

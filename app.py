@@ -196,7 +196,7 @@ if df.empty:
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
-total_ocs = df['NRO_OC'].nunique()  # Conteo único sin duplicados
+total_ocs = df['NRO_OC'].nunique()
 kg_promedio_oc = total_kg / total_ocs if total_ocs > 0 else 0
 total_jabas_est = df['JABAS_EST'].sum()
 
@@ -225,7 +225,7 @@ with tab1:
     df_trend = df.groupby(col_periodo).agg(
         KG_TOTALES=('KILOS_SOLICITADOS', 'sum'),
         VALOR_TOTAL=('VALOR_COMERCIAL', 'sum'),
-        ORDENES=('NRO_OC', 'nunique')  # Validación de órdenes únicas
+        ORDENES=('NRO_OC', 'nunique')
     ).reset_index()
     df_trend['PRECIO_POND'] = df_trend['VALOR_TOTAL'] / df_trend['KG_TOTALES']
     df_trend['TN_TOTALES'] = df_trend['KG_TOTALES'] / 1000.0
@@ -297,24 +297,27 @@ with tab1:
     with col_g2:
         st.subheader("Mix y Concentración por Producto")
         
-        # Agrupación precisa por producto
+        # Agrupación y cálculo para tooltip infalible
         df_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
             VALOR=('VALOR_COMERCIAL', 'sum'),
             KG=('KILOS_SOLICITADOS', 'sum'),
             ORDENES=('NRO_OC', 'nunique')
-        ).reset_index()
+        ).reset_index().sort_values(by='VALOR', ascending=False)
+        
         df_prod['PRECIO_POND'] = df_prod['VALOR'] / df_prod['KG']
+        df_prod['PART_VALOR'] = (df_prod['VALOR'] / valor_comercial_total) * 100
         
-        # Mapeo de colores estricto
+        # Generar texto de hover explícito por sector
+        hover_texts = [
+            f"🥑 <b>{row['DESCRIPCION_PRODUCTO']}</b><br><br>"
+            f"💰 <b>Venta:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
+            f"📦 <b>Volumen:</b> {row['KG']:,.0f} kg ({row['KG']/1000:,.1f} Tn)<br>"
+            f"🏷️ <b>Precio Ponderado:</b> S/ {row['PRECIO_POND']:.2f} /kg<br>"
+            f"📋 <b>Órdenes Únicas:</b> {row['ORDENES']:,} OCs"
+            for _, row in df_prod.iterrows()
+        ]
+        
         pie_colors = [VARIEDAD_COLORS.get(prod, '#2d6a4f') for prod in df_prod['DESCRIPCION_PRODUCTO']]
-        
-        # Matriz 2D para customdata en Pie chart
-        customdata_matrix = np.column_stack((
-            df_prod['KG'],
-            df_prod['PRECIO_POND'],
-            df_prod['ORDENES'],
-            df_prod['VALOR']
-        ))
         
         fig_pie = go.Figure(data=[go.Pie(
             labels=df_prod['DESCRIPCION_PRODUCTO'],
@@ -323,14 +326,8 @@ with tab1:
             marker=dict(colors=pie_colors),
             textposition='inside',
             textinfo='percent+label',
-            customdata=customdata_matrix,
-            hovertemplate=(
-                "<b>Variedad: %{label}</b><br>" +
-                "💰 Facturación: S/ %{customdata[3]:,.2f} (%{percent})<br>" +
-                "📦 Volumen Total: %{customdata[0]:,.0f} kg<br>" +
-                "🏷️ Precio Ponderado: S/ %{customdata[1]:.2f} /kg<br>" +
-                "📋 Órdenes Únicas: %{customdata[2]:,}<extra></extra>"
-            )
+            hoverinfo='text',
+            hovertext=hover_texts
         )])
         
         fig_pie.update_layout(
@@ -341,63 +338,36 @@ with tab1:
         )
         st.plotly_chart(fig_pie, use_container_width=True)
         
-        top_prod = df_prod.loc[df_prod['VALOR'].idxmax()]
-        part_top = (top_prod['VALOR'] / valor_comercial_total) * 100
+        top_prod = df_prod.iloc[0]
         st.markdown(f"""
         <div class="chart-insight">
-            📌 <b>Concentración de Portafolio:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{part_top:.1f}%</b> de la facturación en el periodo filtrado (S/ {top_prod['VALOR']:,.0f}).
+            📌 <b>Concentración de Portafolio:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{top_prod['PART_VALOR']:.1f}%</b> de la facturación en el periodo filtrado (S/ {top_prod['VALOR']:,.0f}).
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("---")
     
-    # --- GRÁFICO DEDICADO DE ÓRDENES DE COMPRA ÚNICAS Y MATRIZ DE VARIACIÓN ---
-    col_oc1, col_oc2 = st.columns([1.1, 1.4])
+    # --- MATRIZ PERIÓDICA DE VARIACIÓN A ANCHO COMPLETO ---
+    st.subheader(f"📋 Matriz Periódica de Variación ({periodo_seleccionado})")
+    st.caption("Semáforo: 🟢 Aumento > +2% | 🟡 Estable [-2%, +2%] | 🔴 Descenso < -2%")
     
-    with col_oc1:
-        st.subheader(f"📋 Órdenes de Compra Únicas por {label_periodo}")
-        fig_oc_bars = px.bar(
-            df_trend,
-            x=col_periodo,
-            y='ORDENES',
-            text='ORDENES',
-            color='ORDENES',
-            color_continuous_scale='Greens',
-            labels={col_periodo: label_periodo, 'ORDENES': 'Órdenes de Compra (OC)'}
-        )
-        fig_oc_bars.update_traces(
-            textposition='outside',
-            hovertemplate=f"<b>{label_periodo}: %{{x}}</b><br>📋 Órdenes Únicas: <b>%{{y:,}}</b><extra></extra>"
-        )
-        fig_oc_bars.update_layout(
-            template='plotly_white',
-            height=370,
-            coloraxis_showscale=False,
-            xaxis=dict(tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
-            margin=dict(t=30, b=20, l=10, r=10)
-        )
-        st.plotly_chart(fig_oc_bars, use_container_width=True)
-
-    with col_oc2:
-        st.subheader(f"📋 Matriz Periódica de Variación ({periodo_seleccionado})")
-        st.caption("Semáforo: 🟢 Aumento > +2% | 🟡 Estable [-2%, +2%] | 🔴 Descenso < -2%")
-        
-        df_var_display = df_trend[[col_periodo, 'KG_TOTALES', 'VAR_KG_PCT', 'PRECIO_POND', 'VAR_PRECIO_PCT', 'VALOR_TOTAL', 'VAR_VALOR_PCT']].copy()
-        df_var_display.columns = [label_periodo, 'Kilos Solicitados', 'Var. Kg %', 'Precio Ponderado', 'Var. Precio %', 'Venta Bruta (S/)', 'Var. Venta %']
-        
-        st.dataframe(
-            df_var_display.style.format({
-                'Kilos Solicitados': '{:,.0f} kg',
-                'Var. Kg %': '{:+.1f}%',
-                'Precio Ponderado': 'S/ {:.2f}',
-                'Var. Precio %': '{:+.1f}%',
-                'Venta Bruta (S/)': 'S/ {:,.0f}',
-                'Var. Venta %': '{:+.1f}%'
-            })
-            .map(style_semaphore, subset=['Var. Kg %', 'Var. Precio %', 'Var. Venta %'])
-            .highlight_null(color='#f1f5f9'),
-            use_container_width=True, height=330, hide_index=True
-        )
+    df_var_display = df_trend[[col_periodo, 'KG_TOTALES', 'VAR_KG_PCT', 'PRECIO_POND', 'VAR_PRECIO_PCT', 'VALOR_TOTAL', 'VAR_VALOR_PCT', 'ORDENES']].copy()
+    df_var_display.columns = [label_periodo, 'Kilos Solicitados', 'Var. Kg %', 'Precio Ponderado', 'Var. Precio %', 'Venta Bruta (S/)', 'Var. Venta %', 'Órdenes (OC)']
+    
+    st.dataframe(
+        df_var_display.style.format({
+            'Kilos Solicitados': '{:,.0f} kg',
+            'Var. Kg %': '{:+.1f}%',
+            'Precio Ponderado': 'S/ {:.2f}',
+            'Var. Precio %': '{:+.1f}%',
+            'Venta Bruta (S/)': 'S/ {:,.0f}',
+            'Var. Venta %': '{:+.1f}%',
+            'Órdenes (OC)': '{:,}'
+        })
+        .map(style_semaphore, subset=['Var. Kg %', 'Var. Precio %', 'Var. Venta %'])
+        .highlight_null(color='#f1f5f9'),
+        use_container_width=True, hide_index=True
+    )
 
 # ==========================================================
 # PESTAÑA 2: PRICING, VARIACIONES % & CONDICIONES COMERCIALES
@@ -575,19 +545,26 @@ with tab2:
         ).reset_index()
         df_fp['PART_VALOR'] = (df_fp['VALOR'] / df_fp['VALOR'].sum()) * 100
         
-        fig_fp = px.pie(
-            df_fp,
-            names='FORMA_PAGO',
-            values='VALOR',
+        # Hover explícito para Forma de Pago
+        hover_fp = [
+            f"<b>Condición {row['FORMA_PAGO']}</b><br><br>"
+            f"💰 <b>Monto:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
+            f"📦 <b>Kilos:</b> {row['KILOS']:,.0f} kg<br>"
+            f"📋 <b>Órdenes:</b> {row['ORDENES']:,} OCs"
+            for _, row in df_fp.iterrows()
+        ]
+        
+        fig_fp = go.Figure(data=[go.Pie(
+            labels=df_fp['FORMA_PAGO'],
+            values=df_fp['VALOR'],
             hole=0.45,
-            color='FORMA_PAGO',
-            color_discrete_map={'Z015': '#16a34a', 'Z045': '#d97706', 'No Definido': '#94a3b8'}
-        )
-        fig_fp.update_traces(
+            marker=dict(colors=['#16a34a' if x == 'Z015' else '#d97706' for x in df_fp['FORMA_PAGO']]),
             textposition='inside',
             textinfo='percent+label',
-            hovertemplate="<b>Condición %{label}</b><br>Monto: S/ %{value:,.2f} (%{percent})<extra></extra>"
-        )
+            hoverinfo='text',
+            hovertext=hover_fp
+        )])
+        
         fig_fp.update_layout(
             template='plotly_white',
             showlegend=False,

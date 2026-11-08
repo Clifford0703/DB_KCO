@@ -12,25 +12,32 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- PALETA CORPORATIVA PERSONALIZADA ---
-COLOR_PRIMARY = "#1b4332"       # Verde bosque profundo
-COLOR_SECONDARY = "#40916c"     # Verde esmeralda suave
-COLOR_ACCENT = "#d97706"        # Ámbar dorado (Pricing)
-COLOR_NEUTRAL = "#0f172a"       # Azul petróleo / texto fuerte
-COLOR_INFO = "#0284c7"          # Azul corporativo
-COLOR_PALETTE = ["#2d6a4f", "#52b788", "#74c69d", "#b7e4c7", "#d8f3dc"]
+# --- PALETA CORPORATIVA DE ALTO CONTRASTE ---
+COLOR_PRIMARY = "#1b4332"
+COLOR_SECONDARY = "#2d6a4f"
+COLOR_ACCENT = "#d97706"
+COLOR_NEUTRAL = "#0f172a"
+COLOR_INFO = "#0284c7"
 
-# --- ESTILOS CSS UI/UX AVANZADOS ---
+VARIEDAD_COLORS = {
+    'PALTA-FUERTE-A-KG': '#1b4332',  # Verde bosque
+    'PALTA-FUERTE-V-KG': '#0284c7',  # Azul zafiro
+    'PALTA-FUERTE-P-KG': '#d97706',  # Ámbar tostado
+    'PALTA-FUERTE-C-KG': '#7c3aed',  # Púrpura intenso
+    'PALTA-M-KG':        '#16a34a'   # Verde esmeralda
+}
+DEFAULT_PALETTE = list(VARIEDAD_COLORS.values())
+
+# --- ESTILOS CSS UI/UX ---
 st.markdown(f"""
     <style>
     .main {{ background-color: #f8fafc; }}
     
-    /* Tarjetas KPI Ejecutivas */
     .metric-card {{
         background: #ffffff;
         padding: 18px 22px;
         border-radius: 12px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
         border-left: 5px solid {COLOR_PRIMARY};
         margin-bottom: 14px;
     }}
@@ -53,11 +60,9 @@ st.markdown(f"""
         margin-top: 3px;
         font-weight: 500;
     }}
-    
-    /* Cuadro de Insights de Gráfico */
     .chart-insight {{
         background-color: #f1f5f9;
-        border-left: 3px solid {COLOR_PRIMARY};
+        border-left: 4px solid {COLOR_PRIMARY};
         padding: 10px 14px;
         border-radius: 6px;
         font-size: 12.5px;
@@ -66,8 +71,6 @@ st.markdown(f"""
         margin-bottom: 18px;
         line-height: 1.45;
     }}
-    
-    /* Contenedor de Filtros Horizontales Superiores */
     .filter-box {{
         background-color: #ffffff;
         padding: 18px 22px;
@@ -89,6 +92,17 @@ PRODUCT_WEIGHTS = {
 }
 KG_PER_JABA = 18.0
 
+# --- FUNCIÓN DE SEMAFORIZACIÓN ---
+def style_semaphore(val):
+    if pd.isna(val):
+        return ''
+    if val > 2.0:
+        return 'background-color: #dcfce7; color: #166534; font-weight: bold;'
+    elif val < -2.0:
+        return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;'
+    else:
+        return 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'
+
 # --- CARGA Y TRANSFORMACIÓN DE DATOS ---
 @st.cache_data
 def load_data():
@@ -104,15 +118,16 @@ def load_data():
     df = pd.read_excel(file_path, sheet_name=xls.sheet_names[0])
     df = df.loc[:, ~df.columns.duplicated()]
 
-    # Fechas y Agrupaciones periódicas
+    # Fechas y Agrupaciones
     df['FECHA_EMISION'] = pd.to_datetime(df['FECHA_EMISION'], format='%d-%m-%Y', errors='coerce')
     df['MES_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-%m')
     df['SEMANA_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-W%V')
     
-    # Estandarización comercial
+    # Estandarización de variables
     df['KILOS_SOLICITADOS'] = df['UNIDADES_SOLICITADAS'].fillna(0)
     df['PRECIO_KG'] = df['PRECIO_FINAL_NETO'].fillna(0)
     df['VALOR_COMERCIAL'] = df['KILOS_SOLICITADOS'] * df['PRECIO_KG']
+    df['FORMA_PAGO'] = df['FORMA_PAGO'].fillna('No Definido')
     
     # Estimaciones logísticas
     def get_fruto_weight(prod):
@@ -149,8 +164,8 @@ with f_row1:
         prods = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
         selected_prods = st.multiselect("Variedad / Calibre", options=prods, default=prods)
     with f3:
-        min_p, max_p = float(df_raw['PRECIO_KG'].min()), float(df_raw['PRECIO_KG'].max())
-        rango_precios = st.slider("Rango de Precio S/ por Kg", min_p, max_p, (min_p, max_p))
+        formas_pago = sorted(df_raw['FORMA_PAGO'].dropna().unique().tolist())
+        selected_fp = st.multiselect("Condición de Pago", options=formas_pago, default=formas_pago)
 
 with f_row2:
     st.markdown("##### ⏱️ Agrupación Temporal")
@@ -161,7 +176,6 @@ with f_row2:
     )
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Columna de tiempo activa para agrupaciones
 col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
 label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
 
@@ -171,13 +185,14 @@ if len(date_range) == 2:
     df = df[(df['FECHA_EMISION'] >= pd.to_datetime(date_range[0])) & (df['FECHA_EMISION'] <= pd.to_datetime(date_range[1]))]
 if selected_prods:
     df = df[df['DESCRIPCION_PRODUCTO'].isin(selected_prods)]
-df = df[(df['PRECIO_KG'] >= rango_precios[0]) & (df['PRECIO_KG'] <= rango_precios[1])]
+if selected_fp:
+    df = df[df['FORMA_PAGO'].isin(selected_fp)]
 
 if df.empty:
     st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
     st.stop()
 
-# --- CÁLCULO DE KPIS GLOBALES ---
+# --- KPIS GLOBALES ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -200,14 +215,13 @@ with kpi5:
 # --- NAVEGACIÓN EN 2 PESTAÑAS ---
 tab1, tab2 = st.tabs([
     "📊 1. Resumen Ejecutivo & Evolución Periódica",
-    "📈 2. Análisis de Precios (Pricing), Variaciones % & Alertas"
+    "📈 2. Análisis de Precios (Pricing), Variaciones % & Condiciones Comerciales"
 ])
 
 # ==========================================================
 # PESTAÑA 1: RESUMEN EJECUTIVO & EVOLUCIÓN PERIÓDICA
 # ==========================================================
 with tab1:
-    # Agrupación periódica según selección (Mes o Semana)
     df_trend = df.groupby(col_periodo).agg(
         KG_TOTALES=('KILOS_SOLICITADOS', 'sum'),
         VALOR_TOTAL=('VALOR_COMERCIAL', 'sum'),
@@ -216,7 +230,6 @@ with tab1:
     df_trend['PRECIO_POND'] = df_trend['VALOR_TOTAL'] / df_trend['KG_TOTALES']
     df_trend['TN_TOTALES'] = df_trend['KG_TOTALES'] / 1000.0
     
-    # Variaciones respecto al periodo anterior
     df_trend['VAR_KG_PCT'] = df_trend['KG_TOTALES'].pct_change() * 100
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
@@ -227,7 +240,6 @@ with tab1:
         st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
         fig_dual = go.Figure()
 
-        # Barras de Volumen
         fig_dual.add_trace(go.Bar(
             x=df_trend[col_periodo],
             y=df_trend['TN_TOTALES'],
@@ -245,7 +257,6 @@ with tab1:
             yaxis='y'
         ))
 
-        # Línea de Precio Ponderado
         fig_dual.add_trace(go.Scatter(
             x=df_trend[col_periodo],
             y=df_trend['PRECIO_POND'],
@@ -273,7 +284,6 @@ with tab1:
         )
         st.plotly_chart(fig_dual, use_container_width=True)
         
-        # Insights dinámicos
         max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
         max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
         st.markdown(f"""
@@ -299,7 +309,8 @@ with tab1:
             names='DESCRIPCION_PRODUCTO',
             values='VALOR',
             hole=0.45,
-            color_discrete_sequence=COLOR_PALETTE,
+            color='DESCRIPCION_PRODUCTO',
+            color_discrete_map=VARIEDAD_COLORS,
             custom_data=['KG', 'PRECIO_POND', 'ORDENES']
         )
         fig_pie.update_traces(
@@ -320,12 +331,13 @@ with tab1:
         part_top = (top_prod['VALOR'] / valor_comercial_total) * 100
         st.markdown(f"""
         <div class="chart-insight">
-            📌 <b>Concentración de Portafolio:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{part_top:.1f}%</b> de la facturación en el periodo filtrado (S/ {top_prod['VALOR']:,.0f}), siendo el principal driver de ingresos.
+            📌 <b>Concentración de Portafolio:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{part_top:.1f}%</b> de la facturación en el periodo filtrado (S/ {top_prod['VALOR']:,.0f}).
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("---")
     st.subheader(f"📋 Matriz Periódica de Variación ({periodo_seleccionado})")
+    st.caption("Semáforo: 🟢 Aumento > +2% | 🟡 Estable [-2%, +2%] | 🔴 Descenso < -2%")
     
     df_var_display = df_trend[[col_periodo, 'KG_TOTALES', 'VAR_KG_PCT', 'PRECIO_POND', 'VAR_PRECIO_PCT', 'VALOR_TOTAL', 'VAR_VALOR_PCT']].copy()
     df_var_display.columns = [label_periodo, 'Kilos Solicitados', 'Var. Kg %', 'Precio Ponderado', 'Var. Precio %', 'Venta Bruta (S/)', 'Var. Venta %']
@@ -338,18 +350,19 @@ with tab1:
             'Var. Precio %': '{:+.1f}%',
             'Venta Bruta (S/)': 'S/ {:,.0f}',
             'Var. Venta %': '{:+.1f}%'
-        }).highlight_null(color='#f1f5f9'),
+        })
+        .map(style_semaphore, subset=['Var. Kg %', 'Var. Precio %', 'Var. Venta %'])
+        .highlight_null(color='#f1f5f9'),
         use_container_width=True, hide_index=True
     )
 
 # ==========================================================
-# PESTAÑA 2: PRICING, VARIACIONES % & AUDITORÍA
+# PESTAÑA 2: PRICING, VARIACIONES % & CONDICIONES COMERCIALES
 # ==========================================================
 with tab2:
     st.subheader("🔍 Auditoría de Variaciones de Precios por Producto")
     st.markdown(f"Evolución y variaciones porcentuales agrupadas por **{periodo_seleccionado.lower()}** para cada variedad.")
     
-    # Agrupación periódica por producto y periodo seleccionado
     df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(
         KG=('KILOS_SOLICITADOS', 'sum'),
         VALOR=('VALOR_COMERCIAL', 'sum')
@@ -357,20 +370,17 @@ with tab2:
     df_prod_trend['PRECIO_POND'] = df_prod_trend['VALOR'] / df_prod_trend['KG']
     df_prod_trend = df_prod_trend.sort_values(by=['DESCRIPCION_PRODUCTO', col_periodo])
     
-    # Cálculo de variación porcentual respecto al periodo previo
     df_prod_trend['PRECIO_PREV'] = df_prod_trend.groupby('DESCRIPCION_PRODUCTO')['PRECIO_POND'].shift(1)
     df_prod_trend['VAR_PRECIO_PCT'] = ((df_prod_trend['PRECIO_POND'] - df_prod_trend['PRECIO_PREV']) / df_prod_trend['PRECIO_PREV']) * 100
     df_prod_trend['DIF_SOLES'] = df_prod_trend['PRECIO_POND'] - df_prod_trend['PRECIO_PREV']
 
-    # Filtrar registros donde hubo cambios y datos válidos
     df_changes = df_prod_trend[df_prod_trend['VAR_PRECIO_PCT'].notna() & (df_prod_trend['VAR_PRECIO_PCT'] != 0)].copy()
 
-    if not df_changes.empty:
-        col_c1, col_c2 = st.columns([1.6, 1])
-        
-        with col_c1:
-            st.markdown(f"##### Variaciones Porcentuales de Precio ({periodo_seleccionado})")
-            
+    col_c1, col_c2 = st.columns([1.5, 1.5])
+    
+    with col_c1:
+        st.markdown(f"##### Variaciones Porcentuales de Precio ({periodo_seleccionado})")
+        if not df_changes.empty:
             fig_var = px.bar(
                 df_changes.tail(25),
                 x=col_periodo,
@@ -395,126 +405,167 @@ with tab2:
                 template='plotly_white',
                 xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
                 yaxis=dict(title='Variación Porcentual (%)'),
-                height=380,
+                height=440,
                 margin=dict(t=20, b=20, l=10, r=10)
             )
             st.plotly_chart(fig_var, use_container_width=True)
-            
-            st.markdown("""
-            <div class="chart-insight">
-                💡 <b>Interpretación de Variaciones:</b> 
-                Valores en <span style="color:#16a34a; font-weight:bold;">verde</span> representan incrementos de precio obtenidos frente a Plaza Vea. 
-                Valores en <span style="color:#dc2626; font-weight:bold;">rojo</span> indican descuentos o ajustes a la baja en la negociación.
-            </div>
-            """, unsafe_allow_html=True)
+        else:
+            st.info("Sin variaciones registradas en el periodo.")
 
-        with col_c2:
-            st.markdown("##### Precios Ponderados por Variedad")
-            fig_line_prod = px.line(
-                df_prod_trend,
-                x=col_periodo,
-                y='PRECIO_POND',
-                color='DESCRIPCION_PRODUCTO',
-                markers=True,
-                color_discrete_sequence=COLOR_PALETTE
+    with col_c2:
+        st.markdown("##### Precios Ponderados por Variedad")
+        fig_line_prod = px.line(
+            df_prod_trend,
+            x=col_periodo,
+            y='PRECIO_POND',
+            color='DESCRIPCION_PRODUCTO',
+            markers=True,
+            color_discrete_map=VARIEDAD_COLORS
+        )
+        fig_line_prod.update_traces(
+            line=dict(width=2.8),
+            marker=dict(size=7),
+            hovertemplate=(
+                f"<b>{label_periodo}: %{{x}}</b><br>" +
+                "🥑 %{fullData.name}<br>" +
+                "🏷️ Precio Ponderado: <b>S/ %{y:.2f} /kg</b><extra></extra>"
             )
-            fig_line_prod.update_traces(
-                hovertemplate=(
-                    f"<b>{label_periodo}: %{{x}}</b><br>" +
-                    "🥑 %{fullData.name}<br>" +
-                    "🏷️ Precio: <b>S/ %{y:.2f} /kg</b><extra></extra>"
-                )
-            )
-            fig_line_prod.update_layout(
-                template='plotly_white',
-                xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
-                yaxis=dict(title='Precio S/ por Kg'),
-                legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5),
-                height=380,
-                margin=dict(t=20, b=20, l=10, r=10)
-            )
-            st.plotly_chart(fig_line_prod, use_container_width=True)
+        )
+        fig_line_prod.update_layout(
+            template='plotly_white',
+            xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
+            yaxis=dict(title='Precio S/ por Kg'),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.03,
+                xanchor="center",
+                x=0.5,
+                title_text=""
+            ),
+            height=440,
+            margin=dict(t=50, b=20, l=10, r=10)
+        )
+        st.plotly_chart(fig_line_prod, use_container_width=True)
 
-        with st.expander("Ver tabla completa de variaciones periódicas de precio"):
-            tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
-            tbl_c.columns = [label_periodo, 'Producto', 'Precio Anterior', 'Precio Actual', 'Diferencia S/', 'Variación %', 'Kilos del Periodo']
-            st.dataframe(
-                tbl_c.sort_values(by=label_periodo, ascending=False).style.format({
-                    'Precio Anterior': 'S/ {:.2f}',
-                    'Precio Actual': 'S/ {:.2f}',
-                    'Diferencia S/': 'S/ {:+.2f}',
-                    'Variación %': '{:+.2f}%',
-                    'Kilos del Periodo': '{:,.0f} kg'
-                }),
-                use_container_width=True, hide_index=True
-            )
-    else:
-        st.info("No se registraron cambios de precios entre los periodos analizados.")
+    if not df_changes.empty:
+        st.markdown("##### Matriz Detallada de Cambios de Precio")
+        tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
+        tbl_c.columns = [label_periodo, 'Producto', 'Precio Anterior', 'Precio Actual', 'Diferencia S/', 'Variación %', 'Kilos del Periodo']
+        st.dataframe(
+            tbl_c.sort_values(by=label_periodo, ascending=False).style.format({
+                'Precio Anterior': 'S/ {:.2f}',
+                'Precio Actual': 'S/ {:.2f}',
+                'Diferencia S/': 'S/ {:+.2f}',
+                'Variación %': '{:+.2f}%',
+                'Kilos del Periodo': '{:,.0f} kg'
+            })
+            .map(style_semaphore, subset=['Variación %', 'Diferencia S/']),
+            use_container_width=True, hide_index=True
+        )
 
     st.markdown("---")
 
-    # Relación Volumen vs Precio y Estimaciones Logísticas
-    col_v1, col_v2 = st.columns(2)
+    # --- NUEVA SECCIÓN DE PRICING INTUITIVO Y CONDICIONES COMERCIALES ---
+    col_v1, col_v2 = st.columns([1.4, 1])
+
     with col_v1:
-        st.subheader("Relación Volumen vs Precio por Orden")
-        fig_scatter = px.scatter(
-            df,
-            x='PRECIO_KG',
-            y='KILOS_SOLICITADOS',
-            color='DESCRIPCION_PRODUCTO',
-            size='VALOR_COMERCIAL',
-            color_discrete_sequence=COLOR_PALETTE,
-            custom_data=['NRO_OC', col_periodo, 'VALOR_COMERCIAL']
-        )
-        fig_scatter.update_traces(
+        st.subheader("🎯 Banda de Negociación de Precios (Mínimo, Ponderado y Máximo)")
+        st.markdown("Rango efectivo de precios pactados con Plaza Vea por variedad.")
+        
+        # Tabla resumen para gráfico de bandas
+        df_banda = df.groupby('DESCRIPCION_PRODUCTO').agg(
+            PRECIO_MIN=('PRECIO_KG', 'min'),
+            PRECIO_MAX=('PRECIO_KG', 'max'),
+            KILOS=('KILOS_SOLICITADOS', 'sum'),
+            VALOR=('VALOR_COMERCIAL', 'sum')
+        ).reset_index()
+        df_banda['PRECIO_POND'] = df_banda['VALOR'] / df_banda['KILOS']
+        
+        fig_banda = go.Figure()
+        
+        # Barra de Rango (Min a Max)
+        fig_banda.add_trace(go.Bar(
+            name='Banda Min-Max',
+            x=df_banda['DESCRIPCION_PRODUCTO'],
+            y=df_banda['PRECIO_MAX'] - df_banda['PRECIO_MIN'],
+            base=df_banda['PRECIO_MIN'],
+            marker_color='rgba(45, 106, 79, 0.25)',
             hovertemplate=(
-                "<b>Orden: %{customdata[0]}</b> (%{customdata[1]})<br>" +
-                "🏷️ Precio: S/ %{x:.2f} /kg<br>" +
-                "📦 Volumen: %{y:,.0f} kg<br>" +
-                "💰 Venta: S/ %{customdata[2]:,.2f}<extra></extra>"
-            )
-        )
-        fig_scatter.update_layout(
+                "<b>%{x}</b><br>" +
+                "Piso: S/ %{base:.2f}<br>" +
+                "Techo: S/ %{customdata:.2f}<extra></extra>"
+            ),
+            customdata=df_banda['PRECIO_MAX']
+        ))
+        
+        # Marcador de Precio Ponderado Real
+        fig_banda.add_trace(go.Scatter(
+            name='Precio Ponderado Real',
+            x=df_banda['DESCRIPCION_PRODUCTO'],
+            y=df_banda['PRECIO_POND'],
+            mode='markers+text',
+            text=df_banda['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
+            textposition='top center',
+            marker=dict(size=12, color=COLOR_ACCENT, symbol='diamond'),
+            hovertemplate="<b>%{x}</b><br>🏷️ Precio Ponderado: <b>S/ %{y:.2f} /kg</b><extra></extra>"
+        ))
+        
+        fig_banda.update_layout(
             template='plotly_white',
             height=370,
-            xaxis_title="Precio Pactado (S/ por Kg)",
-            yaxis_title="Kilos de la Orden (Kg)",
-            margin=dict(t=20, b=20, l=10, r=10)
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+            yaxis_title="Precio (S/ por Kg)",
+            xaxis_title="Variedad",
+            margin=dict(t=40, b=20, l=10, r=10)
         )
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        st.plotly_chart(fig_banda, use_container_width=True)
 
     with col_v2:
-        st.subheader("Dispersión de Precios por Variedad")
-        fig_box = px.box(
-            df,
-            x='DESCRIPCION_PRODUCTO',
-            y='PRECIO_KG',
-            color='DESCRIPCION_PRODUCTO',
-            points='all',
-            color_discrete_sequence=COLOR_PALETTE,
-            custom_data=['NRO_OC', 'KILOS_SOLICITADOS']
+        st.subheader("💳 Condiciones de Pago (Z015 vs Z045)")
+        st.markdown("Impacto en días de crédito y rotación de cobro.")
+        
+        df_fp = df.groupby('FORMA_PAGO').agg(
+            ORDENES=('NRO_OC', 'nunique'),
+            KILOS=('KILOS_SOLICITADOS', 'sum'),
+            VALOR=('VALOR_COMERCIAL', 'sum')
+        ).reset_index()
+        df_fp['PART_VALOR'] = (df_fp['VALOR'] / df_fp['VALOR'].sum()) * 100
+        
+        fig_fp = px.pie(
+            df_fp,
+            names='FORMA_PAGO',
+            values='VALOR',
+            hole=0.45,
+            color='FORMA_PAGO',
+            color_discrete_map={'Z015': '#16a34a', 'Z045': '#d97706', 'No Definido': '#94a3b8'}
         )
-        fig_box.update_traces(
-            hovertemplate=(
-                "<b>Orden: %{customdata[0]}</b><br>" +
-                "🏷️ Precio: S/ %{y:.2f} /kg<br>" +
-                "📦 Volumen: %{customdata[1]:,.0f} kg<extra></extra>"
-            )
+        fig_fp.update_traces(
+            textposition='inside',
+            textinfo='percent+label',
+            hovertemplate="<b>Condición %{label}</b><br>Monto: S/ %{value:,.2f} (%{percent})<extra></extra>"
         )
-        fig_box.update_layout(
+        fig_fp.update_layout(
             template='plotly_white',
             showlegend=False,
             height=370,
-            xaxis_title="Variedad",
-            yaxis_title="Precio de Venta (S/)",
-            margin=dict(t=20, b=20, l=10, r=10)
+            margin=dict(t=40, b=20, l=10, r=10)
         )
-        st.plotly_chart(fig_box, use_container_width=True)
+        st.plotly_chart(fig_fp, use_container_width=True)
+
+    st.markdown("""
+    <div class="chart-insight">
+        📌 <b>Diagnóstico Financiero de Negociación:</b> 
+        Plaza Vea migró sus órdenes de compra al plazo <b>Z045 (45 días)</b> a partir de abril, absorbiendo más del 95% de la facturación anual. 
+        En la banda de precios, variedades como <b>PALTA-M-KG</b> y <b>PALTA-FUERTE-V-KG</b> exhiben mayor amplitud de negociación (techo superior a S/ 12.00 en temporada baja).
+    </div>
+    """, unsafe_allow_html=True)
 
     # Detalle Operativo Final
     st.markdown("---")
     st.subheader("📋 Detalle de Órdenes & Estimaciones Logísticas")
-    cols_grid = ['NRO_OC', 'FECHA_EMISION', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PRECIO_KG', 'VALOR_COMERCIAL', 'JABAS_EST', 'FRUTOS_EST']
+    cols_grid = ['NRO_OC', 'FECHA_EMISION', 'FORMA_PAGO', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PRECIO_KG', 'VALOR_COMERCIAL', 'JABAS_EST', 'FRUTOS_EST']
     df_grid = df[cols_grid].copy()
     df_grid['FECHA_EMISION'] = df_grid['FECHA_EMISION'].dt.strftime('%d-%m-%Y')
     

@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+from datetime import datetime
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -79,6 +80,22 @@ st.markdown(f"""
         margin-bottom: 18px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }}
+    .footer-credits {{
+        border-top: 1px solid #e2e8f0;
+        padding-top: 15px;
+        margin-top: 35px;
+        text-align: center;
+        color: #64748b;
+        font-size: 12px;
+    }}
+    .header-metadata {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        color: #64748b;
+        font-size: 13px;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -138,16 +155,32 @@ def load_data():
     df['JABAS_EST'] = df['KILOS_SOLICITADOS'] / KG_PER_JABA
     df['PRECIO_FRUTO_EST'] = df['PRECIO_KG'] * df['PESO_FRUTO_KG']
     
-    return df
+    # Timestamp de ingesta de datos
+    timestamp_actualizacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    
+    return df, timestamp_actualizacion
 
 try:
-    df_raw = load_data()
+    df_raw, update_time = load_data()
 except Exception as e:
     st.error(f"Error cargando archivo de datos: {e}")
     st.stop()
 
 # --- HEADER PRINCIPAL ---
 st.markdown("## 🥑 KCO Group | Intelligence & Pricing Dashboard")
+
+# Bloque con metadata de desarrollo y actualización
+st.markdown(f"""
+    <div class="header-metadata">
+        <div>
+            <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Industrial Engineering & Operations BI</i>
+        </div>
+        <div>
+            🕒 <b>Última actualización:</b> {update_time}
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
 st.markdown("Análisis estratégico de ventas y pricing en canal Retail: Tendencias periódicas, monitoreo de precios y auditoría operativa.")
 
 # --- SEGMENTACIÓN SUPERIOR ---
@@ -297,7 +330,6 @@ with tab1:
     with col_g2:
         st.subheader("Mix y Concentración por Producto")
         
-        # Agrupación y cálculo para tooltip infalible
         df_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
             VALOR=('VALOR_COMERCIAL', 'sum'),
             KG=('KILOS_SOLICITADOS', 'sum'),
@@ -307,7 +339,6 @@ with tab1:
         df_prod['PRECIO_POND'] = df_prod['VALOR'] / df_prod['KG']
         df_prod['PART_VALOR'] = (df_prod['VALOR'] / valor_comercial_total) * 100
         
-        # Generar texto de hover explícito por sector
         hover_texts = [
             f"🥑 <b>{row['DESCRIPCION_PRODUCTO']}</b><br><br>"
             f"💰 <b>Venta:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
@@ -347,7 +378,6 @@ with tab1:
 
     st.markdown("---")
     
-    # --- MATRIZ PERIÓDICA DE VARIACIÓN A ANCHO COMPLETO ---
     st.subheader(f"📋 Matriz Periódica de Variación ({periodo_seleccionado})")
     st.caption("Semáforo: 🟢 Aumento > +2% | 🟡 Estable [-2%, +2%] | 🔴 Descenso < -2%")
     
@@ -545,7 +575,6 @@ with tab2:
         ).reset_index()
         df_fp['PART_VALOR'] = (df_fp['VALOR'] / df_fp['VALOR'].sum()) * 100
         
-        # Hover explícito para Forma de Pago
         hover_fp = [
             f"<b>Condición {row['FORMA_PAGO']}</b><br><br>"
             f"💰 <b>Monto:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
@@ -598,3 +627,12 @@ with tab2:
         }),
         use_container_width=True, height=320, hide_index=True
     )
+
+# --- FOOTER INSTITUCIONAL ---
+st.markdown(f"""
+    <div class="footer-credits">
+        🥑 <b>KCO Group</b> — Plataforma de Inteligencia Comercial & Pricing &nbsp;|&nbsp; 
+        <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; 
+        <b>Última actualización:</b> {update_time}
+    </div>
+""", unsafe_allow_html=True)

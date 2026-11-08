@@ -18,25 +18,24 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Carga de datos directa desde el repositorio (sin uploader)
+# Carga de datos directa y automática desde el archivo del repositorio (sin uploader)
 @st.cache_data
 def load_data():
     file_path = "Ordenes.xls"
-    # Leer el archivo excel manejando posibles nombres de hojas
     xls = pd.ExcelFile(file_path)
     sheet_name = xls.sheet_names[0]
     df = pd.read_excel(file_path, sheet_name=sheet_name)
     
-    # Asegurar que no existan columnas duplicadas para evitar errores al operar
+    # Eliminar duplicados en nombres de columnas para evitar conflictos en operaciones
     df = df.loc[:, ~df.columns.duplicated()]
 
-    # Limpieza y formateo de fechas (ajustar según formato real de las columnas)
+    # Limpieza y formateo de fechas
     if 'FECHA_EMISION' in df.columns:
         df['FECHA_EMISION'] = pd.to_datetime(df['FECHA_EMISION'], format='%d-%m-%Y', errors='coerce')
     if 'FECHA_ENTREGA' in df.columns:
         df['FECHA_ENTREGA'] = pd.to_datetime(df['FECHA_ENTREGA'], format='%d-%m-%Y', errors='coerce')
     
-    # Validación segura para el cálculo de valores de venta sin duplicidad de índices
+    # Cálculo seguro de valores de venta
     unidades = df['UNIDADES_SOLICITADAS'] if 'UNIDADES_SOLICITADAS' in df.columns else 0
     precio = df['PRECIO_FINAL_NETO'] if 'PRECIO_FINAL_NETO' in df.columns else 0
     
@@ -44,7 +43,7 @@ def load_data():
     
     if 'UNIDADES_EN_DESPACHO' in df.columns:
         df['VALOR_VENTA_DESPACHADO'] = df['UNIDADES_EN_DESPACHO'] * precio
-    
+        
     return df
 
 try:
@@ -132,7 +131,6 @@ st.markdown("---")
 if 'FECHA_EMISION' in df.columns:
     df['MES_EMISION'] = df['FECHA_EMISION'].dt.to_period('M').astype(str)
     
-    # Evitar duplicidad de índices al agrupar
     df_temp = df.copy()
     df_temp['VALOR_PARCIAL'] = df_temp['UNIDADES_SOLICITADAS'] * df_temp['PRECIO_FINAL_NETO']
     
@@ -208,19 +206,18 @@ with col_right:
     st.subheader("🏢 Distribución por Local de Destino")
     if 'NOM_LOCAL_ENTREGA' in df.columns:
         df_local = df.groupby('NOM_LOCAL_ENTREGA').agg(
-            VOLUMEN=('UNIDADES_SOLICITADAS', 'sum'),
-            PENDIENTE=('UNIDADES_PENDIENTES', 'sum') if 'UNIDADES_PENDIENTES' in df.columns else ('UNIDADES_SOLICITADAS', 'sum')
+            VOLUMEN=('UNIDADES_SOLICITADAS', 'sum')
         ).reset_index().sort_values(by='VOLUMEN', ascending=False).head(10)
         
         fig_local = px.bar(
             df_local,
             y='NOM_LOCAL_ENTREGA',
-            x=['VOLUMEN'],
+            x='VOLUMEN',
             orientation='h',
             title='Top 10 Locales por Volumen Solicitado',
-            labels={'value': 'Unidades', 'NOM_LOCAL_ENTREGA': 'Local'}
+            labels={'VOLUMEN': 'Unidades', 'NOM_LOCAL_ENTREGA': 'Local'}
         )
-        fig_local.update_layout(template='plotly_white', barmode='group')
+        fig_local.update_layout(template='plotly_white')
         st.plotly_chart(fig_local, use_container_width=True)
 
 # --- SECCIÓN 3: TABLA DETALLADA ---

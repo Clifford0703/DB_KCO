@@ -23,19 +23,18 @@ st.markdown("""
 def load_data():
     file_path = "Ordenes.xls"
     
-    # Intentar leer con xlrd para .xls antiguos o openpyxl para .xlsx
     try:
         xls = pd.ExcelFile(file_path, engine='xlrd')
     except Exception:
         try:
             xls = pd.ExcelFile(file_path, engine='openpyxl')
         except Exception:
-            xls = pd.ExcelFile(file_path) # Intento por defecto
+            xls = pd.ExcelFile(file_path)
             
     sheet_name = xls.sheet_names[0]
     df = pd.read_excel(file_path, sheet_name=sheet_name)
     
-    # Eliminar duplicados en nombres de columnas para evitar conflictos en operaciones
+    # Eliminar columnas duplicadas
     df = df.loc[:, ~df.columns.duplicated()]
 
     # Limpieza y formateo de fechas
@@ -44,11 +43,15 @@ def load_data():
     if 'FECHA_ENTREGA' in df.columns:
         df['FECHA_ENTREGA'] = pd.to_datetime(df['FECHA_ENTREGA'], format='%d-%m-%Y', errors='coerce')
     
-    # Cálculo seguro de valores de venta
+    # Cálculos clave de negocio
     unidades = df['UNIDADES_SOLICITADAS'] if 'UNIDADES_SOLICITADAS' in df.columns else 0
     precio = df['PRECIO_FINAL_NETO'] if 'PRECIO_FINAL_NETO' in df.columns else 0
     
     df['VALOR_VENTA_SOLICITADO'] = unidades * precio
+    
+    # Suposición de conversión estándar (si el empaque es jaba de 18kg, o métricas directas)
+    # Se calculan toneladas (Tn) y jabas / unidades
+    df['TONELADAS_SOLICITADAS'] = unidades / 1000.0  # Asumiendo kg o unidades equivalentes
     
     if 'UNIDADES_EN_DESPACHO' in df.columns:
         df['VALOR_VENTA_DESPACHADO'] = df['UNIDADES_EN_DESPACHO'] * precio
@@ -76,19 +79,19 @@ if 'FECHA_EMISION' in df_raw.columns and not df_raw['FECHA_EMISION'].isna().all(
 else:
     date_range = None
 
-# Filtro por Producto
+# Filtro por Producto / Variedad
 if 'DESCRIPCION_PRODUCTO' in df_raw.columns:
     productos = ['Todos'] + sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
-    selected_producto = st.sidebar.selectbox("Producto", productos)
+    selected_producto = st.sidebar.selectbox("Variedad de Palta", productos)
 else:
     selected_producto = 'Todos'
 
-# Filtro por Local de Entrega
-if 'NOM_LOCAL_ENTREGA' in df_raw.columns:
-    locales = ['Todos'] + sorted(df_raw['NOM_LOCAL_ENTREGA'].dropna().unique().tolist())
-    selected_local = st.sidebar.selectbox("Local de Entrega / Cliente", locales)
+# Filtro por Tipo de OC
+if 'TIPO_OC' in df_raw.columns:
+    tipos_oc = ['Todos'] + sorted(df_raw['TIPO_OC'].dropna().unique().tolist())
+    selected_tipo_oc = st.sidebar.selectbox("Tipo de Orden de Compra", tipos_oc)
 else:
-    selected_local = 'Todos'
+    selected_tipo_oc = 'Todos'
 
 # Aplicar filtros
 df = df_raw.copy()
@@ -99,12 +102,12 @@ if date_range and len(date_range) == 2:
 if selected_producto != 'Todos':
     df = df[df['DESCRIPCION_PRODUCTO'] == selected_producto]
 
-if selected_local != 'Todos':
-    df = df[df['NOM_LOCAL_ENTREGA'] == selected_local]
+if selected_tipo_oc != 'Todos':
+    df = df[df['TIPO_OC'] == selected_tipo_oc]
 
 # --- HEADER PRINCIPAL ---
-st.title("🥑 Dashboard Ejecutivo: Control de Órdenes y Ventas de Paltas")
-st.markdown("Monitoreo de evolución de volumen, cantidad de órdenes y curva de precios ponderados.")
+st.title("🥑 Control Gerencial de Ventas y Pricing - Distribuidora de Paltas")
+st.markdown("Análisis financiero, evolución de volúmenes, cantidad de órdenes (OC) y precios ponderados.")
 
 if df.empty:
     st.warning("No hay datos disponibles para los filtros seleccionados.")
@@ -112,31 +115,30 @@ if df.empty:
 
 # --- KPIs PRINCIPALES ---
 total_oc = df['NRO_OC'].nunique() if 'NRO_OC' in df.columns else len(df)
-volumen_solicitado = df['UNIDADES_SOLICITADAS'].sum() if 'UNIDADES_SOLICITADAS' in df.columns else 0
-volumen_despachado = df['UNIDADES_EN_DESPACHO'].sum() if 'UNIDADES_EN_DESPACHO' in df.columns else 0
+volumen_unidades = df['UNIDADES_SOLICITADAS'].sum() if 'UNIDADES_SOLICITADAS' in df.columns else 0
+volumen_tn = df['TONELADAS_SOLICITADAS'].sum() if 'TONELADAS_SOLICITADAS' in df.columns else 0
+monto_total_venta = df['VALOR_VENTA_SOLICITADO'].sum() if 'VALOR_VENTA_SOLICITADO' in df.columns else 0
 
-if 'UNIDADES_SOLICITADAS' in df.columns and 'PRECIO_FINAL_NETO' in df.columns:
-    precio_ponderado = (df['UNIDADES_SOLICITADAS'] * df['PRECIO_FINAL_NETO']).sum() / volumen_solicitado if volumen_solicitado > 0 else 0
+if volumen_unidades > 0:
+    precio_ponderado_general = monto_total_venta / volumen_unidades
 else:
-    precio_ponderado = 0
-
-fulfillment_rate = (volumen_despachado / volumen_solicitado) * 100 if volumen_solicitado > 0 else 0
+    precio_ponderado_general = 0
 
 col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     st.metric("Total Órdenes (OC)", f"{total_oc:,}")
 with col2:
-    st.metric("Volumen Solicitado", f"{volumen_solicitado:,.0f}")
+    st.metric("Volumen Solicitado", f"{volumen_unidades:,.0f} un/jabas")
 with col3:
-    st.metric("Volumen Despachado", f"{volumen_despachado:,.0f}")
+    st.metric("Volumen en Tn (Est.)", f"{volumen_tn:,.2f} Tn")
 with col4:
-    st.metric("Precio Ponderado", f"S/ {precio_ponderado:,.2f}")
+    st.metric("Venta Potencial Total", f"S/ {monto_total_venta:,.2f}")
 with col5:
-    st.metric("Nivel de Servicio", f"{fulfillment_rate:.1f}%")
+    st.metric("Precio Ponderado Prom.", f"S/ {precio_ponderado_general:,.2f}")
 
 st.markdown("---")
 
-# --- AGRUPACIÓN TEMPORAL PARA EVOLUCIÓN ---
+# --- PROCESAMIENTO MENSUAL PARA TENDENCIAS ---
 if 'FECHA_EMISION' in df.columns:
     df['MES_EMISION'] = df['FECHA_EMISION'].dt.to_period('M').astype(str)
     
@@ -146,92 +148,118 @@ if 'FECHA_EMISION' in df.columns:
     df_trend = df_temp.groupby('MES_EMISION').agg(
         CANT_OC=('NRO_OC', 'nunique'),
         VOLUMEN=('UNIDADES_SOLICITADAS', 'sum'),
+        TONELADAS=('TONELADAS_SOLICITADAS', 'sum'),
         VALOR_TOTAL=('VALOR_PARCIAL', 'sum')
     ).reset_index()
     
     df_trend['PRECIO_PONDERADO'] = df_trend['VALOR_TOTAL'] / df_trend['VOLUMEN']
 
-    # --- SECCIÓN 1: CURVA DE VENTAS Y PRECIOS PONDERADOS ---
-    st.subheader("📈 Curva de Evolución: Volumen, Cantidad de OC y Precio Ponderado")
+    # --- GRÁFICO 1: TENDENCIA MENSUAL DE VOLUMEN Y PRECIO PONDERADO (DOBLE EJE) ---
+    st.subheader("📈 Tendencia Mensual: Volumen Solicitado vs Precio Ponderado")
+    
+    fig_dual = go.Figure()
 
-    fig = go.Figure()
-
-    fig.add_trace(go.Bar(
+    # Barras de Volumen
+    fig_dual.add_trace(go.Bar(
         x=df_trend['MES_EMISION'],
         y=df_trend['VOLUMEN'],
-        name='Volumen Solicitado',
+        name='Volumen (Unidades/Jabas)',
         marker_color='#2ca02c',
+        text=df_trend['VOLUMEN'].apply(lambda x: f"{x:,.0f}"),
+        textposition='outside',
         yaxis='y'
     ))
 
-    fig.add_trace(go.Scatter(
+    # Línea de Precio Ponderado
+    fig_dual.add_trace(go.Scatter(
         x=df_trend['MES_EMISION'],
         y=df_trend['PRECIO_PONDERADO'],
         name='Precio Ponderado (S/)',
-        mode='lines+markers',
+        mode='lines+markers+text',
+        text=df_trend['PRECIO_PONDERADO'].apply(lambda x: f"S/ {x:.2f}"),
+        textposition='top center',
         marker_color='#ff7f0e',
         line=dict(width=3),
         yaxis='y2'
     ))
 
-    fig.update_layout(
-        title='Evolución Mensual de Volumen de Venta y Precio Ponderado',
+    fig_dual.update_layout(
+        title='Evolución de Volumen de Venta y Precio Ponderado por Mes',
         xaxis=dict(title='Mes de Emisión'),
         yaxis=dict(title='Volumen Total', side='left', showgrid=False),
         yaxis2=dict(title='Precio Ponderado (S/)', overlaying='y', side='right', showgrid=True),
         legend=dict(x=0.01, y=0.99),
         template='plotly_white',
-        hovermode='x unified'
+        hovermode='x unified',
+        margin=dict(t=50, b=30)
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig_dual, use_container_width=True)
 
-# --- SECCIÓN 2: ANÁLISIS DETALLADO ---
-col_left, col_right = st.columns(2)
+    # --- GRÁFICO 2: EVOLUCIÓN DE LA CANTIDAD DE ÓRDENES DE COMPRA (OC) Y VALOR ---
+    st.markdown("---")
+    col_g1, col_g2 = st.columns(2)
 
-with col_left:
-    st.subheader("📊 Volumen por Producto")
-    if 'DESCRIPCION_PRODUCTO' in df.columns:
-        df_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
-            CANT_OC=('NRO_OC', 'nunique'),
-            VOLUMEN=('UNIDADES_SOLICITADAS', 'sum'),
-            PRECIO_PROMEDIO=('PRECIO_FINAL_NETO', 'mean')
-        ).reset_index()
-        
-        fig_prod = px.bar(
-            df_prod,
-            x='DESCRIPCION_PRODUCTO',
-            y='VOLUMEN',
+    with col_g1:
+        st.subheader("📊 Cantidad de Órdenes de Compra (OC) por Mes")
+        fig_oc = px.bar(
+            df_trend,
+            x='MES_EMISION',
+            y='CANT_OC',
             text='CANT_OC',
-            color='PRECIO_PROMEDIO',
+            color='CANT_OC',
             color_continuous_scale='Greens',
-            labels={'DESCRIPCION_PRODUCTO': 'Variedad/Producto', 'VOLUMEN': 'Volumen Solicitado'}
+            labels={'MES_EMISION': 'Mes', 'CANT_OC': 'Número de OCs'}
         )
-        fig_prod.update_traces(texttemplate='%{text} OCs', textposition='outside')
-        fig_prod.update_layout(template='plotly_white', xaxis_tickangle=-30)
-        st.plotly_chart(fig_prod, use_container_width=True)
+        fig_oc.update_traces(texttemplate='%{text} OCs', textposition='outside')
+        fig_oc.update_layout(template='plotly_white', showlegend=False)
+        st.plotly_chart(fig_oc, use_container_width=True)
 
-with col_right:
-    st.subheader("🏢 Distribución por Local de Destino")
-    if 'NOM_LOCAL_ENTREGA' in df.columns:
-        df_local = df.groupby('NOM_LOCAL_ENTREGA').agg(
-            VOLUMEN=('UNIDADES_SOLICITADAS', 'sum')
-        ).reset_index().sort_values(by='VOLUMEN', ascending=False).head(10)
-        
-        fig_local = px.bar(
-            df_local,
-            y='NOM_LOCAL_ENTREGA',
-            x='VOLUMEN',
-            orientation='h',
-            title='Top 10 Locales por Volumen Solicitado',
-            labels={'VOLUMEN': 'Unidades', 'NOM_LOCAL_ENTREGA': 'Local'}
+    with col_g2:
+        st.subheader("💰 Evolución del Valor de Venta Total (S/)")
+        fig_val = px.line(
+            df_trend,
+            x='MES_EMISION',
+            y='VALOR_TOTAL',
+            text=df_trend['VALOR_TOTAL'].apply(lambda x: f"S/ {x:,.0f}"),
+            markers=True,
+            labels={'MES_EMISION': 'Mes', 'VALOR_TOTAL': 'Venta Total (S/)'}
         )
-        fig_local.update_layout(template='plotly_white')
-        st.plotly_chart(fig_local, use_container_width=True)
+        fig_val.update_traces(textposition='top center', line=dict(color='#2ca02c', width=3))
+        fig_val.update_layout(template='plotly_white')
+        st.plotly_chart(fig_val, use_container_width=True)
 
-# --- SECCIÓN 3: TABLA DETALLADA ---
+# --- ANÁLISIS POR VARIEDAD DE PRODUCTO ---
 st.markdown("---")
-st.subheader("📋 Detalle de Órdenes de Compra")
+st.subheader("🥑 Desglose por Variedad de Palta y Precios Ponderados")
 
-with st.expander("Ver tabla completa de registros filtrados"):
+if 'DESCRIPCION_PRODUCTO' in df.columns:
+    df_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
+        CANT_OC=('NRO_OC', 'nunique'),
+        VOLUMEN=('UNIDADES_SOLICITADAS', 'sum'),
+        VALOR_TOTAL=('VALOR_VENTA_SOLICITADO', 'sum'),
+        PRECIO_MEDIO=('PRECIO_FINAL_NETO', 'mean')
+    ).reset_index()
+    
+    df_prod['PRECIO_PONDERADO'] = df_prod['VALOR_TOTAL'] / df_prod['VOLUMEN']
+
+    fig_prod = px.bar(
+        df_prod,
+        x='DESCRIPCION_PRODUCTO',
+        y='VOLUMEN',
+        text=df_prod['VOLUMEN'].apply(lambda x: f"{x:,.0f} un"),
+        color='PRECIO_PONDERADO',
+        color_continuous_scale='Tealgrn',
+        labels={'DESCRIPCION_PRODUCTO': 'Variedad de Producto', 'VOLUMEN': 'Volumen Solicitado', 'PRECIO_PONDERADO': 'Precio Ponderado (S/)'},
+        title='Volumen por Variedad y Precio Ponderado de Cierre'
+    )
+    fig_prod.update_traces(textposition='outside')
+    fig_prod.update_layout(template='plotly_white', xaxis_tickangle=-20)
+    st.plotly_chart(fig_prod, use_container_width=True)
+
+# --- TABLA DETALLADA DE REGISTROS ---
+st.markdown("---")
+st.subheader("📋 Detalle Operativo de Solicitudes y Envíos")
+
+with st.expander("Ver tabla completa de datos filtrados"):
     st.dataframe(df, use_container_width=True)

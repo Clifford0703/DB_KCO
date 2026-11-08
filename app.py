@@ -529,3 +529,389 @@ with tab2:
         # Mercado: muestra meses impares + Noviembre
         text_mkt_intercalado = []
         for idx, val in enumerate(mkt_2026_real[:11]):
+            mes_num = idx + 1
+            if pd.isna(val):
+                text_mkt_intercalado.append("")
+            elif mes_num % 2 != 0 or mes_num == 11:  # Ene, Mar, May, Jul, Set, Nov
+                text_mkt_intercalado.append(f"S/{val:.2f}")
+            else:
+                text_mkt_intercalado.append("")
+
+        # KCO: muestra meses pares + Noviembre
+        text_kco_intercalado = []
+        for idx, val in enumerate(kco_2026_real[:11]):
+            mes_num = idx + 1
+            if pd.isna(val):
+                text_kco_intercalado.append("")
+            elif mes_num % 2 == 0 or mes_num == 11:  # Feb, Abr, Jun, Ago, Oct, Nov
+                text_kco_intercalado.append(f"S/{val:.2f}")
+            else:
+                text_kco_intercalado.append("")
+
+        # --- CONSTRUCCIÓN DEL GRÁFICO PLOTLY ---
+        fig_anual = go.Figure()
+
+        # A. Mercado Mayorista 2025
+        fig_anual.add_trace(go.Scatter(
+            x=meses_nombres,
+            y=mkt_2025,
+            name='Mayorista 2025 (Referencia)',
+            mode='lines+markers',
+            line=dict(color='#cbd5e1', width=2, dash='dot'),
+            marker=dict(size=5, color='#cbd5e1'),
+            hovertemplate="<b>%{x} (Mayorista 2025)</b><br>Precio: S/ %{y:.2f} /kg<extra></extra>"
+        ))
+
+        # B. Mercado Mayorista 2026 (Real Ene - Nov)
+        fig_anual.add_trace(go.Scatter(
+            x=meses_nombres[:11],
+            y=mkt_2026_real[:11],
+            name='Mayorista 2026 (Costo Base)',
+            mode='lines+markers+text',
+            text=text_mkt_intercalado,
+            textposition='bottom center',
+            textfont=dict(color='#475569', size=11, family='Arial', weight='bold'),
+            line=dict(color='#475569', width=2.8),
+            marker=dict(size=7, color='#475569'),
+            hovertemplate="<b>%{x} (Mayorista 2026)</b><br>Costo Mercado: S/ %{y:.2f} /kg<extra></extra>"
+        ))
+
+        # C. Proyección Mercado Dic (Punteada)
+        fig_anual.add_trace(go.Scatter(
+            x=['Nov', 'Dic'],
+            y=[mkt_nov_val, mkt_dic_pred],
+            name='Mayorista 2026 (Previsión Dic)',
+            mode='lines+markers+text',
+            text=["", f"S/{mkt_dic_pred:.2f}*"],
+            textposition='bottom center',
+            textfont=dict(color='#64748b', size=11, family='Arial', weight='bold'),
+            line=dict(color='#64748b', width=2.5, dash='dash'),
+            marker=dict(size=8, symbol='diamond', color='#64748b'),
+            hovertemplate="<b>%{x} (Previsión Mercado)</b><br>Costo Estimado: S/ %{y:.2f} /kg<extra></extra>"
+        ))
+
+        # D. KCO Retail - Venta Ponderada Real (Ene - Nov)
+        fig_anual.add_trace(go.Scatter(
+            x=meses_nombres[:11],
+            y=kco_2026_real[:11],
+            name='KCO Venta Cliente 2026 (Ponderado)',
+            mode='lines+markers+text',
+            text=text_kco_intercalado,
+            textposition='top center',
+            textfont=dict(color='#1b4332', size=11, family='Arial', weight='bold'),
+            line=dict(color='#1b4332', width=3.5),
+            marker=dict(size=9, color='#1b4332'),
+            hovertemplate="<b>%{x} (KCO Venta)</b><br>Precio Ponderado: S/ %{y:.2f} /kg<extra></extra>"
+        ))
+
+        # E. Proyección KCO Dic (Punteada)
+        fig_anual.add_trace(go.Scatter(
+            x=['Nov', 'Dic'],
+            y=[kco_nov_val, kco_dic_pred],
+            name='KCO Venta (Previsión Dic)',
+            mode='lines+markers+text',
+            text=["", f"S/{kco_dic_pred:.2f}*"],
+            textposition='top center',
+            textfont=dict(color='#d97706', size=12, family='Arial', weight='bold'),
+            line=dict(color='#d97706', width=3.2, dash='dash'),
+            marker=dict(size=10, symbol='star', color='#d97706'),
+            hovertemplate="<b>%{x} (Previsión KCO)</b><br>Cotización Sugerida: S/ %{y:.2f} /kg<extra></extra>"
+        ))
+
+        fig_anual.update_layout(
+            autosize=True,
+            template='plotly_white',
+            height=440,
+            xaxis=dict(
+                title='',
+                categoryorder='array',
+                categoryarray=meses_nombres,
+                tickfont=dict(size=12, weight='bold', color='#1e293b')
+            ),
+            yaxis=dict(
+                title='Precio (S/ por Kg)',
+                gridcolor='#f1f5f9',
+                zeroline=False
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.03,
+                xanchor="center",
+                x=0.5,
+                title_text=""
+            ),
+            margin=dict(t=45, b=25, l=10, r=10)
+        )
+        st.plotly_chart(fig_anual, use_container_width=True, config=PLOTLY_CONFIG)
+
+        # Resumen de previsión y sugerencia comercial
+        c_prev1, c_prev2, c_prev3 = st.columns(3)
+        with c_prev1:
+            st.markdown(f"""
+                <div class="metric-card" style="border-left-color: #64748b;">
+                    <div class="metric-title">Costo Mayorista (Nov Real / Dic Proy)</div>
+                    <div class="metric-value">S/ {mkt_nov_val:.2f} ➔ S/ {mkt_dic_pred:.2f}</div>
+                    <div class="metric-sub">Ajuste estacional fin de año (-20.1%)</div>
+                </div>
+            """, unsafe_allow_html=True)
+        with c_prev2:
+            st.markdown(f"""
+                <div class="metric-card" style="border-left-color: #1b4332;">
+                    <div class="metric-title">KCO Venta Cliente (Nov Real)</div>
+                    <div class="metric-value">S/ {kco_nov_val:.2f} /kg</div>
+                    <div class="metric-sub">Precio ponderado registrado a la fecha</div>
+                </div>
+            """, unsafe_allow_html=True)
+        with c_prev3:
+            st.markdown(f"""
+                <div class="metric-card" style="border-left-color: #d97706;">
+                    <div class="metric-title">KCO Cotización Sugerida (Dic Proy)</div>
+                    <div class="metric-value">S/ {kco_dic_pred:.2f} /kg</div>
+                    <div class="metric-sub">Banda objetivo: S/ {kco_dic_pred - 0.30:.2f} a S/ {kco_dic_pred + 0.30:.2f}</div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="chart-insight">
+            💡 <b>Estrategia de Pricing para Diciembre:</b> 
+            En <b>Diciembre</b>, el incremento de cosecha temprana en valles costeros empuja a la baja el costo mayorista (como ocurrió en 2025 al pasar de S/ 7.41 a S/ 5.92). 
+            La <b>línea punteada dorada (*)</b> proyecta que cotizar a tu cliente en torno a <b>S/ {kco_dic_pred:.2f} /kg</b> asegura tu margen habitual de intermediación (~S/ {spread_historico:.2f}/kg) manteniendo la competitividad frente a otros proveedores de retail.
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("Sube el archivo 'reporte_fuerte.xls' al repositorio para habilitar la previsión contra el mercado mayorista.")
+
+    st.markdown("---")
+
+    # --- AUDITORÍA DE VARIACIONES DE PRECIO Y LÍNEAS POR VARIEDAD ---
+    st.subheader("🔍 Auditoría de Variaciones de Precios por Producto")
+    st.caption(f"Evolución y variaciones porcentuales agrupadas por **{periodo_seleccionado.lower()}** para cada variedad.")
+    
+    df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(
+        KG=('KILOS_SOLICITADOS', 'sum'),
+        VALOR=('VALOR_COMERCIAL', 'sum')
+    ).reset_index()
+    df_prod_trend['PRECIO_POND'] = df_prod_trend['VALOR'] / df_prod_trend['KG']
+    df_prod_trend = df_prod_trend.sort_values(by=['DESCRIPCION_PRODUCTO', col_periodo])
+    
+    df_prod_trend['PRECIO_PREV'] = df_prod_trend.groupby('DESCRIPCION_PRODUCTO')['PRECIO_POND'].shift(1)
+    df_prod_trend['VAR_PRECIO_PCT'] = ((df_prod_trend['PRECIO_POND'] - df_prod_trend['PRECIO_PREV']) / df_prod_trend['PRECIO_PREV']) * 100
+    df_prod_trend['DIF_SOLES'] = df_prod_trend['PRECIO_POND'] - df_prod_trend['PRECIO_PREV']
+
+    df_changes = df_prod_trend[df_prod_trend['VAR_PRECIO_PCT'].notna() & (df_prod_trend['VAR_PRECIO_PCT'] != 0)].copy()
+
+    col_c1, col_c2 = st.columns([1.5, 1.5])
+    
+    with col_c1:
+        st.markdown(f"##### Variaciones Porcentuales de Precio ({periodo_seleccionado})")
+        if not df_changes.empty:
+            fig_var = px.bar(
+                df_changes.tail(20),
+                x=col_periodo,
+                y='VAR_PRECIO_PCT',
+                color='VAR_PRECIO_PCT',
+                text=df_changes.tail(20)['VAR_PRECIO_PCT'].apply(lambda x: f"{x:+.1f}%"),
+                color_continuous_scale='RdYlGn',
+                custom_data=['DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'KG']
+            )
+            fig_var.update_traces(
+                textposition='outside',
+                outsidetextfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
+                hovertemplate=(
+                    f"<b>{label_periodo}: %{{x}}</b><br>" +
+                    "🥑 <b>Producto: %{customdata[0]}</b><br>" +
+                    "🏷️ Precio Anterior: S/ %{customdata[1]:.2f} /kg<br>" +
+                    "🏷️ Precio Nuevo: S/ %{customdata[2]:.2f} /kg<br>" +
+                    "📊 Variación: <b>%{y:+.2f}%</b><br>" +
+                    "📦 Volumen: %{customdata[3]:,.0f} kg<extra></extra>"
+                )
+            )
+            fig_var.update_layout(
+                autosize=True,
+                template='plotly_white',
+                xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
+                yaxis=dict(title='Variación Porcentual (%)'),
+                height=400,
+                margin=dict(t=20, b=25, l=10, r=10)
+            )
+            st.plotly_chart(fig_var, use_container_width=True, config=PLOTLY_CONFIG)
+        else:
+            st.info("Sin variaciones registradas en el periodo.")
+
+    with col_c2:
+        st.markdown("##### Precios Ponderados por Variedad")
+        fig_line_prod = px.line(
+            df_prod_trend,
+            x=col_periodo,
+            y='PRECIO_POND',
+            color='DESCRIPCION_PRODUCTO',
+            markers=True,
+            color_discrete_map=VARIEDAD_COLORS
+        )
+        fig_line_prod.update_traces(
+            line=dict(width=2.8),
+            marker=dict(size=7),
+            hovertemplate=(
+                f"<b>{label_periodo}: %{{x}}</b><br>" +
+                "🥑 %{fullData.name}<br>" +
+                "🏷️ Precio Ponderado: <b>S/ %{y:.2f} /kg</b><extra></extra>"
+            )
+        )
+        fig_line_prod.update_layout(
+            autosize=True,
+            template='plotly_white',
+            xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
+            yaxis=dict(title='Precio S/ por Kg'),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.03,
+                xanchor="center",
+                x=0.5,
+                title_text=""
+            ),
+            height=400,
+            margin=dict(t=45, b=25, l=10, r=10)
+        )
+        st.plotly_chart(fig_line_prod, use_container_width=True, config=PLOTLY_CONFIG)
+
+    if not df_changes.empty:
+        with st.expander("Ver tabla completa de historial de cambios de precio"):
+            tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
+            tbl_c.columns = [label_periodo, 'Producto', 'Precio Anterior', 'Precio Actual', 'Diferencia S/', 'Variación %', 'Kilos del Periodo']
+            st.dataframe(
+                tbl_c.sort_values(by=label_periodo, ascending=False).style.format({
+                    'Precio Anterior': 'S/ {:.2f}',
+                    'Precio Actual': 'S/ {:.2f}',
+                    'Diferencia S/': 'S/ {:+.2f}',
+                    'Variación %': '{:+.2f}%',
+                    'Kilos del Periodo': '{:,.0f} kg'
+                })
+                .map(style_semaphore, subset=['Variación %', 'Diferencia S/']),
+                use_container_width=True, hide_index=True
+            )
+
+    st.markdown("---")
+
+    # --- BANDA DE NEGOCIACIÓN Y CONDICIONES COMERCIALES ---
+    col_v1, col_v2 = st.columns([1.5, 1])
+
+    with col_v1:
+        st.subheader("🎯 Banda de Negociación de Precios (Mín / Pond / Máx)")
+        st.caption("Rango efectivo de precios pactados por variedad en el periodo analizado.")
+        
+        df_banda = df.groupby('DESCRIPCION_PRODUCTO').agg(
+            PRECIO_MIN=('PRECIO_KG', 'min'),
+            PRECIO_MAX=('PRECIO_KG', 'max'),
+            KILOS=('KILOS_SOLICITADOS', 'sum'),
+            VALOR=('VALOR_COMERCIAL', 'sum')
+        ).reset_index()
+        df_banda['PRECIO_POND'] = df_banda['VALOR'] / df_banda['KILOS']
+        
+        fig_banda = go.Figure()
+        
+        fig_banda.add_trace(go.Bar(
+            name='Banda Min-Max',
+            x=df_banda['DESCRIPCION_PRODUCTO'],
+            y=df_banda['PRECIO_MAX'] - df_banda['PRECIO_MIN'],
+            base=df_banda['PRECIO_MIN'],
+            marker_color='rgba(45, 106, 79, 0.25)',
+            hovertemplate=(
+                "<b>%{x}</b><br>" +
+                "Piso: S/ %{base:.2f}<br>" +
+                "Techo: S/ %{customdata:.2f}<extra></extra>"
+            ),
+            customdata=df_banda['PRECIO_MAX']
+        ))
+        
+        fig_banda.add_trace(go.Scatter(
+            name='Precio Ponderado Real',
+            x=df_banda['DESCRIPCION_PRODUCTO'],
+            y=df_banda['PRECIO_POND'],
+            mode='markers+text',
+            text=df_banda['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
+            textposition='top center',
+            textfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
+            marker=dict(size=12, color=COLOR_ACCENT, symbol='diamond'),
+            hovertemplate="<b>%{x}</b><br>🏷️ Precio Ponderado: <b>S/ %{y:.2f} /kg</b><extra></extra>"
+        ))
+        
+        fig_banda.update_layout(
+            autosize=True,
+            template='plotly_white',
+            height=370,
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+            yaxis_title="Precio (S/ por Kg)",
+            xaxis_title="Variedad",
+            margin=dict(t=35, b=25, l=10, r=10)
+        )
+        st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
+
+    with col_v2:
+        st.subheader("💳 Condiciones de Pago (Z015 vs Z045)")
+        st.caption("Impacto en días de crédito y rotación de cobro.")
+        
+        df_fp = df.groupby('FORMA_PAGO').agg(
+            ORDENES=('NRO_OC', 'nunique'),
+            KILOS=('KILOS_SOLICITADOS', 'sum'),
+            VALOR=('VALOR_COMERCIAL', 'sum')
+        ).reset_index()
+        df_fp['PART_VALOR'] = (df_fp['VALOR'] / df_fp['VALOR'].sum()) * 100
+        
+        hover_fp = [
+            f"<b>Condición {row['FORMA_PAGO']}</b><br><br>"
+            f"💰 <b>Monto:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
+            f"📦 <b>Kilos:</b> {row['KILOS']:,.0f} kg<br>"
+            f"📋 <b>Órdenes:</b> {row['ORDENES']:,} OCs"
+            for _, row in df_fp.iterrows()
+        ]
+        
+        fig_fp = go.Figure(data=[go.Pie(
+            labels=df_fp['FORMA_PAGO'],
+            values=df_fp['VALOR'],
+            hole=0.45,
+            marker=dict(colors=['#16a34a' if x == 'Z015' else '#d97706' for x in df_fp['FORMA_PAGO']]),
+            textposition='inside',
+            textinfo='percent+label',
+            insidetextfont=dict(color='#ffffff', size=11, family="Arial", weight="bold"),
+            hoverinfo='text',
+            hovertext=hover_fp
+        )])
+        
+        fig_fp.update_layout(
+            autosize=True,
+            template='plotly_white',
+            showlegend=False,
+            height=370,
+            margin=dict(t=25, b=20, l=10, r=10)
+        )
+        st.plotly_chart(fig_fp, use_container_width=True, config=PLOTLY_CONFIG)
+
+    # Detalle Operativo Final
+    st.markdown("---")
+    st.subheader("📋 Detalle de Órdenes & Estimaciones Logísticas")
+    cols_grid = ['NRO_OC', 'FECHA_EMISION', 'FORMA_PAGO', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PRECIO_KG', 'VALOR_COMERCIAL', 'JABAS_EST', 'FRUTOS_EST']
+    df_grid = df[cols_grid].copy()
+    df_grid['FECHA_EMISION'] = df_grid['FECHA_EMISION'].dt.strftime('%d-%m-%Y')
+    
+    st.dataframe(
+        df_grid.style.format({
+            'KILOS_SOLICITADOS': '{:,.0f} kg',
+            'PRECIO_KG': 'S/ {:.2f}',
+            'VALOR_COMERCIAL': 'S/ {:,.2f}',
+            'JABAS_EST': '{:,.1f}',
+            'FRUTOS_EST': '{:,.0f}'
+        }),
+        use_container_width=True, height=320, hide_index=True
+    )
+
+# --- FOOTER INSTITUCIONAL FULL-WIDTH ---
+st.markdown(f"""
+    <div class="footer-credits">
+        🥑 <b>KCO Group</b> — Plataforma de Inteligencia Comercial & Pricing &nbsp;|&nbsp; 
+        <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; 
+        <b>Última actualización:</b> {update_time}
+    </div>
+""", unsafe_allow_html=True)

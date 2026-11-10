@@ -320,7 +320,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR: FILTROS LATERALES FORMATEADOS Y ELEGANTES ---
+# --- SIDEBAR: FILTROS LATERALES FORMATEADOS ---
 with st.sidebar:
     st.markdown("### 🥑 Panel de Control")
     st.caption("Configura los parámetros de visualización")
@@ -477,7 +477,7 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # 1. GRÁFICO A TODO EL ANCHO: ESTACIONES DEL AÑO ÚNICAMENTE AQUÍ
+    # 1. GRÁFICO A TODO EL ANCHO: ESTACIONES DEL AÑO DEBAJO DE LOS MESES
     st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
     fig_dual = go.Figure()
 
@@ -521,24 +521,48 @@ if vista_activa == "📊 Resumen & Evolución":
         yaxis='y2'
     ))
 
-    # ESTACIONES DEL AÑO EN EL PERÚ + VENTANA DE ALTA DEMANDA (ÚNICAMENTE EN ESTE GRÁFICO)
+    anotaciones_estaciones = []
+
+    # ESTACIONES DEL AÑO EN EL PERÚ: SOMBREADO + ETIQUETAS DEBAJO DEL EJE X
     if periodo_seleccionado == "Mensual":
         lista_meses = df_trend[col_periodo].tolist()
         
-        # Filtros de meses para asignar bandas
         m_verano = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [1, 2, 3])]
         m_otono = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [4, 5, 6])]
         m_invierno = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [7, 8, 9])]
         m_primavera = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [10, 11, 12])]
 
         if m_verano:
-            fig_dual.add_vrect(x0=m_verano[0], x1=m_verano[-1], fillcolor="rgba(254, 240, 138, 0.15)", layer="below", line_width=0, annotation_text="☀️ Verano", annotation_position="top left", annotation_font=dict(size=10, color="#854d0e"))
+            fig_dual.add_vrect(x0=m_verano[0], x1=m_verano[-1], fillcolor="rgba(254, 240, 138, 0.15)", layer="below", line_width=0)
+            anotaciones_estaciones.append(dict(
+                x=m_verano[len(m_verano)//2], y=-0.16, xref='x', yref='paper',
+                text="☀️ Verano", showarrow=False,
+                font=dict(size=11, color="#854d0e", weight="bold")
+            ))
+
         if m_otono:
-            fig_dual.add_vrect(x0=m_otono[0], x1=m_otono[-1], fillcolor="rgba(254, 215, 170, 0.15)", layer="below", line_width=0, annotation_text="🍂 Otoño", annotation_position="top left", annotation_font=dict(size=10, color="#9a3412"))
+            fig_dual.add_vrect(x0=m_otono[0], x1=m_otono[-1], fillcolor="rgba(254, 215, 170, 0.15)", layer="below", line_width=0)
+            anotaciones_estaciones.append(dict(
+                x=m_otono[len(m_otono)//2], y=-0.16, xref='x', yref='paper',
+                text="🍂 Otoño", showarrow=False,
+                font=dict(size=11, color="#9a3412", weight="bold")
+            ))
+
         if m_invierno:
-            fig_dual.add_vrect(x0=m_invierno[0], x1=m_invierno[-1], fillcolor="rgba(224, 242, 254, 0.25)", layer="below", line_width=0, annotation_text="❄️ Invierno", annotation_position="top left", annotation_font=dict(size=10, color="#0369a1"))
+            fig_dual.add_vrect(x0=m_invierno[0], x1=m_invierno[-1], fillcolor="rgba(224, 242, 254, 0.25)", layer="below", line_width=0)
+            anotaciones_estaciones.append(dict(
+                x=m_invierno[len(m_invierno)//2], y=-0.16, xref='x', yref='paper',
+                text="❄️ Invierno", showarrow=False,
+                font=dict(size=11, color="#0369a1", weight="bold")
+            ))
+
         if m_primavera:
-            fig_dual.add_vrect(x0=m_primavera[0], x1=m_primavera[-1], fillcolor="rgba(220, 252, 231, 0.20)", layer="below", line_width=0, annotation_text="🌸 Primavera", annotation_position="top left", annotation_font=dict(size=10, color="#15803d"))
+            fig_dual.add_vrect(x0=m_primavera[0], x1=m_primavera[-1], fillcolor="rgba(220, 252, 231, 0.20)", layer="below", line_width=0)
+            anotaciones_estaciones.append(dict(
+                x=m_primavera[len(m_primavera)//2], y=-0.16, xref='x', yref='paper',
+                text="🌸 Primavera", showarrow=False,
+                font=dict(size=11, color="#15803d", weight="bold")
+            ))
 
         # Ventana de Mayor Demanda / Cosecha Alta (Mayo - Setiembre)
         m_alta = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in range(5, 10))]
@@ -546,25 +570,26 @@ if vista_activa == "📊 Resumen & Evolución":
             fig_dual.add_vrect(
                 x0=m_alta[0],
                 x1=m_alta[-1],
-                fillcolor="rgba(34, 197, 94, 0.10)",
+                fillcolor="rgba(34, 197, 94, 0.08)",
                 layer="below",
                 line_width=1.5,
                 line_dash="dot",
                 line_color="rgba(21, 128, 61, 0.6)",
-                annotation_text="🔥 Temporada Alta & Mayor Demanda (May - Set)",
-                annotation_position="bottom left",
-                annotation_font=dict(size=11, color="#15803d", weight="bold")
+                annotation_text="🔥 Temporada Alta & Mayor Demanda",
+                annotation_position="top left",
+                annotation_font=dict(size=10.5, color="#15803d", weight="bold")
             )
 
     fig_dual.update_layout(
         autosize=True,
-        xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
+        xaxis=dict(title='', tickangle=-30 if periodo_seleccionado == "Semanal" else 0),
         yaxis=dict(title='Volumen Total (Tn)', showgrid=False),
         yaxis2=dict(title='Precio Pond. (S/ /kg)', overlaying='y', side='right', showgrid=True),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         template='plotly_white',
-        height=450,
-        margin=dict(t=45, b=25, l=10, r=10)
+        annotations=anotaciones_estaciones,
+        height=470,
+        margin=dict(t=40, b=55, l=10, r=10)
     )
     st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
     
@@ -580,81 +605,82 @@ if vista_activa == "📊 Resumen & Evolución":
 
     st.markdown("---")
 
-    # 2. GRÁFICO DEBAJO: Mix y Concentración por Producto
-    st.subheader("Mix y Concentración por Producto")
+    # 2. MIX DE PRODUCTO Y MATRIZ PERIÓDICA EN LA MISMA LÍNEA (2 COLUMNAS)
+    col_mix, col_matriz = st.columns([1, 1.35])
     
-    df_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
-        VALOR=('VALOR_COMERCIAL', 'sum'),
-        KG=('KILOS_SOLICITADOS', 'sum'),
-        ORDENES=('NRO_OC', 'nunique')
-    ).reset_index().sort_values(by='VALOR', ascending=False)
-    
-    df_prod['PRECIO_POND'] = df_prod['VALOR'] / df_prod['KG']
-    df_prod['PART_VALOR'] = (df_prod['VALOR'] / valor_comercial_total) * 100
-    
-    hover_texts = [
-        f"🥑 <b>{row['DESCRIPCION_PRODUCTO']}</b><br><br>"
-        f"💰 <b>Venta:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
-        f"📦 <b>Volumen:</b> {row['KG']:,.0f} kg ({row['KG']/1000:,.1f} Tn)<br>"
-        f"🏷️ <b>Precio Ponderado:</b> S/ {row['PRECIO_POND']:.2f} /kg<br>"
-        f"📋 <b>Órdenes Únicas:</b> {row['ORDENES']:,} OCs"
-        for _, row in df_prod.iterrows()
-    ]
-    
-    pie_colors = [VARIEDAD_COLORS.get(prod, '#2d6a4f') for prod in df_prod['DESCRIPCION_PRODUCTO']]
-    
-    fig_pie = go.Figure(data=[go.Pie(
-        labels=df_prod['DESCRIPCION_PRODUCTO'],
-        values=df_prod['VALOR'],
-        hole=0.45,
-        marker=dict(colors=pie_colors),
-        textposition='inside',
-        textinfo='percent+label',
-        insidetextfont=dict(color='#ffffff', size=11, family="Arial", weight="bold"),
-        hoverinfo='text',
-        hovertext=hover_texts
-    )])
-    
-    fig_pie.update_layout(
-        autosize=True,
-        template='plotly_white',
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
-        height=440,
-        margin=dict(t=25, b=25, l=10, r=10)
-    )
-    st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
-    
-    top_prod = df_prod.iloc[0]
-    st.markdown(f"""
-    <div class="chart-insight">
-        📌 <b>Concentración de Portafolio:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{top_prod['PART_VALOR']:.1f}%</b> de la facturación (S/ {top_prod['VALOR']:,.0f}).
-    </div>
-    """, unsafe_allow_html=True)
+    with col_mix:
+        st.subheader("Mix y Concentración por Producto")
+        
+        df_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
+            VALOR=('VALOR_COMERCIAL', 'sum'),
+            KG=('KILOS_SOLICITADOS', 'sum'),
+            ORDENES=('NRO_OC', 'nunique')
+        ).reset_index().sort_values(by='VALOR', ascending=False)
+        
+        df_prod['PRECIO_POND'] = df_prod['VALOR'] / df_prod['KG']
+        df_prod['PART_VALOR'] = (df_prod['VALOR'] / valor_comercial_total) * 100
+        
+        hover_texts = [
+            f"🥑 <b>{row['DESCRIPCION_PRODUCTO']}</b><br><br>"
+            f"💰 <b>Venta:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
+            f"📦 <b>Volumen:</b> {row['KG']:,.0f} kg ({row['KG']/1000:,.1f} Tn)<br>"
+            f"🏷️ <b>Precio Ponderado:</b> S/ {row['PRECIO_POND']:.2f} /kg<br>"
+            f"📋 <b>Órdenes Únicas:</b> {row['ORDENES']:,} OCs"
+            for _, row in df_prod.iterrows()
+        ]
+        
+        pie_colors = [VARIEDAD_COLORS.get(prod, '#2d6a4f') for prod in df_prod['DESCRIPCION_PRODUCTO']]
+        
+        fig_pie = go.Figure(data=[go.Pie(
+            labels=df_prod['DESCRIPCION_PRODUCTO'],
+            values=df_prod['VALOR'],
+            hole=0.45,
+            marker=dict(colors=pie_colors),
+            textposition='inside',
+            textinfo='percent+label',
+            insidetextfont=dict(color='#ffffff', size=11, family="Arial", weight="bold"),
+            hoverinfo='text',
+            hovertext=hover_texts
+        )])
+        
+        fig_pie.update_layout(
+            autosize=True,
+            template='plotly_white',
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.18, xanchor="center", x=0.5),
+            height=430,
+            margin=dict(t=15, b=25, l=10, r=10)
+        )
+        st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
+        
+        top_prod = df_prod.iloc[0]
+        st.markdown(f"""
+        <div class="chart-insight">
+            📌 <b>Concentración:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{top_prod['PART_VALOR']:.1f}%</b> de la facturación (S/ {top_prod['VALOR']:,.0f}).
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown("---")
-    
-    # 3. MATRIZ PERIÓDICA DE VARIACIÓN
-    st.subheader(f"📋 Matriz Periódica de Variación ({periodo_seleccionado})")
-    st.caption("Semáforo: 🟢 Aumento > +2% | 🟡 Estable [-2%, +2%] | 🔴 Descenso < -2%")
-    
-    df_var_display = df_trend[[col_periodo, 'KG_TOTALES', 'VAR_KG_PCT', 'PRECIO_POND', 'VAR_PRECIO_PCT', 'VALOR_TOTAL', 'VAR_VALOR_PCT', 'ORDENES']].copy()
-    df_var_display.columns = [label_periodo, 'Kilos Solicitados', 'Var. Kg %', 'Precio Ponderado', 'Var. Precio %', 'Venta Bruta (S/)', 'Var. Venta %', 'Órdenes (OC)']
-    
-    st.dataframe(
-        df_var_display.style.format({
-            'Kilos Solicitados': '{:,.0f} kg',
-            'Var. Kg %': '{:+.1f}%',
-            'Precio Ponderado': 'S/ {:.2f}',
-            'Var. Precio %': '{:+.1f}%',
-            'Venta Bruta (S/)': 'S/ {:,.0f}',
-            'Var. Venta %': '{:+.1f}%',
-            'Órdenes (OC)': '{:,}'
-        })
-        .map(style_semaphore, subset=['Var. Kg %', 'Var. Precio %', 'Var. Venta %'])
-        .highlight_null(color='#f1f5f9'),
-        use_container_width=True, hide_index=True
-    )
+    with col_matriz:
+        st.subheader(f"📋 Matriz Periódica de Variación ({periodo_seleccionado})")
+        st.caption("Semáforo: 🟢 Aumento > +2% | 🟡 Estable [-2%, +2%] | 🔴 Descenso < -2%")
+        
+        df_var_display = df_trend[[col_periodo, 'KG_TOTALES', 'VAR_KG_PCT', 'PRECIO_POND', 'VAR_PRECIO_PCT', 'VALOR_TOTAL', 'VAR_VALOR_PCT', 'ORDENES']].copy()
+        df_var_display.columns = [label_periodo, 'Kilos Solicitados', 'Var. Kg %', 'Precio Ponderado', 'Var. Precio %', 'Venta Bruta (S/)', 'Var. Venta %', 'Órdenes (OC)']
+        
+        st.dataframe(
+            df_var_display.style.format({
+                'Kilos Solicitados': '{:,.0f} kg',
+                'Var. Kg %': '{:+.1f}%',
+                'Precio Ponderado': 'S/ {:.2f}',
+                'Var. Precio %': '{:+.1f}%',
+                'Venta Bruta (S/)': 'S/ {:,.0f}',
+                'Var. Venta %': '{:+.1f}%',
+                'Órdenes (OC)': '{:,}'
+            })
+            .map(style_semaphore, subset=['Var. Kg %', 'Var. Precio %', 'Var. Venta %'])
+            .highlight_null(color='#f1f5f9'),
+            use_container_width=True, height=430, hide_index=True
+        )
 
 # ==========================================================
 # VISTA 2: BENCHMARK MAYORISTA, PREVISIONES & PRICING
@@ -961,7 +987,7 @@ else:
 
     st.markdown("---")
 
-    # --- BANDA DE NEGOCIACIÓN DE PRECIOS A ANCHO COMPLETO (SIN CONDICIONES DE PAGO) ---
+    # --- BANDA DE NEGOCIACIÓN DE PRECIOS A ANCHO COMPLETO ---
     st.subheader("🎯 Banda de Negociación de Precios (Mín / Pond / Máx)")
     st.caption("Rango efectivo de precios pactados por variedad en el periodo analizado.")
     

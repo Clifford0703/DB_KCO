@@ -32,76 +32,83 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#16a34a'
 }
 
-# --- ESTILOS CSS TIPO POWER BI ---
+# --- ESTILOS CSS CON HEADER INTEGRADO EN EL BORDE SUPERIOR ---
 st.markdown(f"""
     <style>
+    /* 1. Anular el espacio superior vacío de Streamlit */
     header[data-testid="stHeader"] {{
-        height: 2.2rem !important;
         background: transparent !important;
+        height: 0px !important;
+        z-index: 99 !important;
     }}
+    
     .main {{ 
         background-color: #f8fafc; 
     }}
+    
     .block-container {{
         max-width: 100% !important;
-        padding-top: 2.2rem !important;
-        padding-bottom: 0.8rem !important;
-        padding-left: 0.8rem !important;
-        padding-right: 0.8rem !important;
+        padding-top: 0.2rem !important;  /* Empieza exactamente pegado al borde superior */
+        padding-bottom: 0.5rem !important;
+        padding-left: 0.7rem !important;
+        padding-right: 0.7rem !important;
     }}
     
-    .pbi-header {{
+    /* 2. Barra Superior Unificada al borde de la pantalla */
+    .top-navbar {{
         display: flex;
         justify-content: space-between;
         align-items: center;
         background: #ffffff;
-        padding: 6px 14px;
-        border-radius: 8px;
+        padding: 4px 12px;
+        border-radius: 6px;
         border: 1px solid #e2e8f0;
-        margin-bottom: 6px;
+        margin-top: 0px;
+        margin-bottom: 5px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }}
-    .pbi-title {{
-        font-size: 17px;
+    .top-title {{
+        font-size: 16px;
         font-weight: 800;
         color: #0f172a;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         white-space: nowrap;
     }}
     
     .chart-header {{
-        font-size: 12px;
+        font-size: 11.5px;
         font-weight: 700;
         color: #0f172a;
-        margin-top: 3px;
+        margin-top: 2px;
         margin-bottom: 2px;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
     }}
 
+    /* KPIs Compactos estilo Power BI */
     .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(5, 1fr);
-        gap: 6px;
-        margin-bottom: 6px;
+        gap: 5px;
+        margin-bottom: 5px;
         width: 100%;
     }}
     .metric-card {{
         background: #ffffff;
-        padding: 5px 10px;
-        border-radius: 6px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-        border-left: 3.5px solid {COLOR_PRIMARY};
+        padding: 4px 8px;
+        border-radius: 5px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        border-left: 3px solid {COLOR_PRIMARY};
         display: flex;
         flex-direction: column;
         justify-content: center;
         box-sizing: border-box;
     }}
     .metric-title {{
-        font-size: 9.5px;
+        font-size: 9px;
         color: #64748b;
         font-weight: 700;
         text-transform: uppercase;
@@ -109,14 +116,14 @@ st.markdown(f"""
         line-height: 1.1;
     }}
     .metric-value {{
-        font-size: 16px;
+        font-size: 15px;
         color: {COLOR_NEUTRAL};
         font-weight: 800;
         margin-top: 1px;
-        line-height: 1.15;
+        line-height: 1.1;
     }}
     .metric-sub {{
-        font-size: 9px;
+        font-size: 8.5px;
         color: #94a3b8;
         font-weight: 500;
         line-height: 1.1;
@@ -125,31 +132,31 @@ st.markdown(f"""
     .drilldown-bar {{
         background: #e0f2fe;
         border-left: 3.5px solid #0284c7;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 11.5px;
+        padding: 3px 8px;
+        border-radius: 5px;
+        font-size: 11px;
         font-weight: 700;
         color: #0369a1;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
     }}
 
     div[data-testid="stRadio"] > div {{
         background: #e2e8f0;
         padding: 2px;
-        border-radius: 8px;
+        border-radius: 6px;
         gap: 2px;
     }}
     div[data-testid="stRadio"] > div > label {{
         flex: 1 1 0;
         background: transparent;
-        padding: 5px 10px !important;
-        border-radius: 6px;
+        padding: 4px 8px !important;
+        border-radius: 5px;
         text-align: center;
         font-weight: 700;
-        font-size: 11.5px !important;
+        font-size: 11px !important;
         justify-content: center;
         cursor: pointer;
         margin: 0 !important;
@@ -157,7 +164,7 @@ st.markdown(f"""
     div[data-testid="stRadio"] > div > label[data-checked="true"] {{
         background: {COLOR_PRIMARY} !important;
         color: #ffffff !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }}
     div[data-testid="stRadio"] > div > label[data-checked="true"] p {{
         color: #ffffff !important;
@@ -285,23 +292,23 @@ if df.empty:
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
-# --- HEADER TIPO POWER BI: TÍTULO A LA IZQUIERDA, AUTOR + BOTÓN SOLO ÍCONO A LA DERECHA ---
-head_col_left, head_col_right = st.columns([1.8, 2.2])
+# --- BARRA SUPERIOR TOTALMENTE INTEGRADA AL BORDE SUPERIOR ---
+head_col_left, head_col_right = st.columns([2.1, 1.9])
 
 with head_col_left:
-    st.markdown('<div class="pbi-title">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
+    st.markdown('<div class="top-title">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
 
 with head_col_right:
     components.html(f"""
-        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; height: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-            <div style="color: #64748b; font-size: 11px; text-align: right; line-height: 1.2;">
-                <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i><br>
-                <span style="color: #94a3b8; font-size: 10px;">🕒 Act: {update_time}</span>
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; height: 28px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <div style="color: #64748b; font-size: 10.5px; text-align: right; line-height: 1.15;">
+                <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i> &nbsp;•&nbsp; 
+                <span style="color: #94a3b8;">🕒 {update_time}</span>
             </div>
             <button id="fs-btn" onclick="toggleFullScreen()" title="Pantalla Completa" style="
-                background-color: #1b4332; color: #ffffff; border: none; border-radius: 6px;
-                width: 32px; height: 30px; font-size: 14px; cursor: pointer;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: center;
+                background-color: #1b4332; color: #ffffff; border: none; border-radius: 5px;
+                width: 28px; height: 26px; font-size: 13px; cursor: pointer;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;
             ">
                 <span id="fs-icon">⛶</span>
             </button>
@@ -321,7 +328,7 @@ with head_col_right:
                 }}
             }}
         </script>
-    """, height=35)
+    """, height=30)
 
 # --- KPIS TIPO CARDS POWER BI ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
@@ -408,7 +415,7 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # GRÁFICO SUPERIOR
+    # GRÁFICO SUPERIOR (CON VENTANA DESLIZABLE EN VISTA SEMANAL)
     st.markdown(f'<div class="chart-header">📈 {titulo_grafico}</div>', unsafe_allow_html=True)
     fig_dual = go.Figure()
 
@@ -420,7 +427,7 @@ if vista_activa == "📊 Resumen & Evolución":
         text=df_trend['TN_TOTALES'].apply(lambda x: f"<b>{x:,.1f} Tn</b>"),
         textposition='outside',
         cliponaxis=False,
-        outsidetextfont=dict(color='#064e3b', size=9.5, family="Arial"),
+        outsidetextfont=dict(color='#064e3b', size=9, family="Arial"),
         hovertemplate=f"<b>{label_actual}: %{{x}}</b><br>Volumen: %{{y:.2f}} Tn (%{{customdata[0]:,.0f}} kg)<br>Venta: S/ %{{customdata[2]:,.2f}}<extra></extra>",
         customdata=np.stack((df_trend['KG_TOTALES'], df_trend['ORDENES'], df_trend['VALOR_TOTAL']), axis=-1),
         yaxis='y'
@@ -431,7 +438,7 @@ if vista_activa == "📊 Resumen & Evolución":
         y=df_trend['PRECIO_POND'],
         name='Precio (S/)',
         mode='lines+markers',
-        marker=dict(size=7, color=COLOR_ACCENT, line=dict(color="#ffffff", width=1)),
+        marker=dict(size=6, color=COLOR_ACCENT, line=dict(color="#ffffff", width=1)),
         line=dict(width=2.5, color=COLOR_ACCENT),
         hovertemplate=f"<b>{label_actual}: %{{x}}</b><br>Precio Pond: <b>S/ %{{y:.2f}} /kg</b><extra></extra>",
         yaxis='y2'
@@ -448,7 +455,7 @@ if vista_activa == "📊 Resumen & Evolución":
             text=f"<b>S/{p_val:.2f}</b>",
             showarrow=True, arrowhead=0, arrowcolor='rgba(0,0,0,0)',
             yshift=10, bgcolor="#fffbeb", bordercolor="#d97706", borderwidth=1, borderpad=2,
-            font=dict(color="#9a3412", size=9, family="Arial")
+            font=dict(color="#9a3412", size=8.5, family="Arial")
         ))
 
     if es_vista_mensual and not mes_en_drilldown:
@@ -474,18 +481,43 @@ if vista_activa == "📊 Resumen & Evolución":
         agregar_delimitador_estacion(m_invierno, "❄️ Invierno", "#0369a1")
         agregar_delimitador_estacion(m_primavera, "🌸 Primavera", "#15803d")
 
+    # CONFIGURACIÓN DEL EJE X CON VENTANA DE ÚLTIMAS 20 SEMANAS Y BARRA DESLIZABLE (SLIDER)
+    xaxis_config = dict(
+        title='',
+        tickangle=-35 if (periodo_seleccionado == "Semanal" or mes_en_drilldown) else 0,
+        tickfont=dict(size=9)
+    )
+    
+    # Si la vista es Semanal (general), se muestran las últimas 20 semanas y se activa el rangeslider
+    if periodo_seleccionado == "Semanal" and not mes_en_drilldown:
+        total_semanas = len(df_trend[col_actual])
+        if total_semanas > 20:
+            semanas_lista = df_trend[col_actual].tolist()
+            xaxis_config['range'] = [semanas_lista[-20], semanas_lista[-1]]
+            xaxis_config['rangeslider'] = dict(
+                visible=True,
+                thickness=0.06,
+                bgcolor="#f1f5f9",
+                bordercolor="#cbd5e1",
+                borderwidth=1
+            )
+        else:
+            xaxis_config['rangeslider'] = dict(visible=False)
+    else:
+        xaxis_config['rangeslider'] = dict(visible=False)
+
     fig_dual.update_layout(
         autosize=True,
         clickmode='event+select',
-        xaxis=dict(title='', tickangle=-30 if (periodo_seleccionado == "Semanal" or mes_en_drilldown) else 0, tickfont=dict(size=9.5)),
-        yaxis=dict(title='Volumen (Tn)', showgrid=False, titlefont=dict(size=9.5), tickfont=dict(size=9)),
-        yaxis2=dict(title='Precio S/ /kg', overlaying='y', side='right', showgrid=True, titlefont=dict(size=9.5), tickfont=dict(size=9)),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=9.5)),
+        xaxis=xaxis_config,
+        yaxis=dict(title='Volumen (Tn)', showgrid=False, titlefont=dict(size=9.5), tickfont=dict(size=8.5)),
+        yaxis2=dict(title='Precio S/ /kg', overlaying='y', side='right', showgrid=True, titlefont=dict(size=9.5), tickfont=dict(size=8.5)),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=9)),
         template='plotly_white',
         shapes=lineas_estaciones,
         annotations=anotaciones_totales,
-        height=240,
-        margin=dict(t=20, b=55 if (es_vista_mensual and not mes_en_drilldown) else 25, l=8, r=8)
+        height=250 if (periodo_seleccionado == "Semanal" and not mes_en_drilldown) else 235,
+        margin=dict(t=20, b=45 if (es_vista_mensual and not mes_en_drilldown) else 20, l=8, r=8)
     )
 
     chart_key = "grafico_mensual_click" if not mes_en_drilldown else "grafico_semanal_view"
@@ -530,7 +562,7 @@ if vista_activa == "📊 Resumen & Evolución":
             marker=dict(colors=pie_colors),
             textposition='inside',
             textinfo='percent+label',
-            insidetextfont=dict(color='#ffffff', size=9.5, family="Arial"),
+            insidetextfont=dict(color='#ffffff', size=9, family="Arial"),
             hoverinfo='label+percent+value'
         )])
         
@@ -538,7 +570,7 @@ if vista_activa == "📊 Resumen & Evolución":
             autosize=True,
             template='plotly_white',
             showlegend=False,
-            height=230,
+            height=225,
             margin=dict(t=5, b=5, l=5, r=5)
         )
         st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
@@ -560,7 +592,7 @@ if vista_activa == "📊 Resumen & Evolución":
             })
             .map(style_semaphore, subset=['Var %', 'Var P %', 'Var V %'])
             .highlight_null(color='#f1f5f9'),
-            use_container_width=True, height=230, hide_index=True
+            use_container_width=True, height=225, hide_index=True
         )
 
 # ==========================================================
@@ -639,9 +671,9 @@ else:
         ))
 
         fig_anual.update_layout(
-            autosize=True, template='plotly_white', height=220,
-            xaxis=dict(title='', categoryorder='array', categoryarray=meses_nombres, tickfont=dict(size=9.5, color='#1e293b')),
-            yaxis=dict(title='Precio S/ /kg', gridcolor='#f1f5f9', zeroline=False, titlefont=dict(size=9.5), tickfont=dict(size=9)),
+            autosize=True, template='plotly_white', height=215,
+            xaxis=dict(title='', categoryorder='array', categoryarray=meses_nombres, tickfont=dict(size=9, color='#1e293b')),
+            yaxis=dict(title='Precio S/ /kg', gridcolor='#f1f5f9', zeroline=False, titlefont=dict(size=9), tickfont=dict(size=8.5)),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=9)),
             margin=dict(t=25, b=20, l=8, r=8)
         )
@@ -670,10 +702,10 @@ else:
             ))
             fig_banda.add_trace(go.Scatter(
                 name='Precio Pond', x=df_banda['DESCRIPCION_PRODUCTO'], y=df_banda['PRECIO_POND'], mode='markers+text',
-                text=df_banda['PRECIO_POND'].apply(lambda x: f"<b>S/{x:.2f}</b>"), textposition='top center', textfont=dict(color='#0f172a', size=9),
+                text=df_banda['PRECIO_POND'].apply(lambda x: f"<b>S/{x:.2f}</b>"), textposition='top center', textfont=dict(color='#0f172a', size=8.5),
                 marker=dict(size=7, color=COLOR_ACCENT, symbol='diamond')
             ))
-            fig_banda.update_layout(autosize=True, template='plotly_white', height=210, showlegend=False, yaxis=dict(title='Precio S/ /kg', titlefont=dict(size=9), tickfont=dict(size=8.5)), xaxis=dict(tickfont=dict(size=8.5)), margin=dict(t=12, b=15, l=8, r=8))
+            fig_banda.update_layout(autosize=True, template='plotly_white', height=205, showlegend=False, yaxis=dict(title='Precio S/ /kg', titlefont=dict(size=8.5), tickfont=dict(size=8)), xaxis=dict(tickfont=dict(size=8)), margin=dict(t=10, b=15, l=8, r=8))
             st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
 
         # Cálculo de cambios de precio
@@ -693,13 +725,13 @@ else:
                     text=df_changes.tail(15)['VAR_PRECIO_PCT'].apply(lambda x: f"<b>{x:+.1f}%</b>"),
                     color_continuous_scale='RdYlGn', custom_data=['DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND']
                 )
-                fig_var.update_traces(textposition='outside', outsidetextfont=dict(color='#0f172a', size=9))
-                fig_var.update_layout(autosize=True, template='plotly_white', height=210, coloraxis_showscale=False, yaxis=dict(title='Var %', titlefont=dict(size=9), tickfont=dict(size=8.5)), xaxis=dict(title='', tickangle=-30, tickfont=dict(size=8.5)), margin=dict(t=12, b=15, l=8, r=8))
+                fig_var.update_traces(textposition='outside', outsidetextfont=dict(color='#0f172a', size=8.5))
+                fig_var.update_layout(autosize=True, template='plotly_white', height=205, coloraxis_showscale=False, yaxis=dict(title='Var %', titlefont=dict(size=8.5), tickfont=dict(size=8)), xaxis=dict(title='', tickangle=-30, tickfont=dict(size=8)), margin=dict(t=10, b=15, l=8, r=8))
                 st.plotly_chart(fig_var, use_container_width=True, config=PLOTLY_CONFIG)
             else:
                 st.info("Sin variaciones en el periodo.")
 
-        # 4. MATRIZ DE HISTORIAL DE CAMBIOS DE PRECIO EN PESTAÑA DESPLEGABLE (EXPANDER)
+        # 4. MATRIZ DE HISTORIAL DE CAMBIOS DE PRECIO EN PESTAÑA DESPLEGABLE
         with st.expander("📋 Ver Matriz Histórica de Cambios de Precio"):
             if not df_changes.empty:
                 tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
@@ -713,7 +745,7 @@ else:
                         'Kilos del Periodo': '{:,.0f} kg'
                     })
                     .map(style_semaphore, subset=['Variación %', 'Diferencia S/']),
-                    use_container_width=True, height=220, hide_index=True
+                    use_container_width=True, height=210, hide_index=True
                 )
             else:
                 st.info("No hay variaciones de precios registradas en el rango seleccionado.")

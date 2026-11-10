@@ -45,7 +45,7 @@ st.markdown(f"""
     }}
     .block-container {{
         max-width: 100% !important;
-        padding-top: 0.15rem !important;
+        padding-top: 0.2rem !important;
         padding-bottom: 0.5rem !important;
         padding-left: 0.7rem !important;
         padding-right: 0.7rem !important;
@@ -66,7 +66,7 @@ st.markdown(f"""
         display: grid;
         grid-template-columns: repeat(5, 1fr);
         gap: 5px;
-        margin-bottom: 5px;
+        margin-bottom: 6px;
         width: 100%;
     }}
     .metric-card {{
@@ -265,63 +265,12 @@ if df.empty:
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
-# --- HEADER UNIFICADO: TÍTULO CON BOTÓN DE PANTALLA COMPLETA AL COSTADO Y AUTOR A LA DERECHA ---
-components.html(f"""
-    <div style="
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        height: 32px; 
-        padding: 0 4px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    ">
-        <!-- Izquierda: Título y botón al costado -->
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 16px; font-weight: 800; color: #0f172a; white-space: nowrap;">
-                🥑 KCO Group | Intelligence & Pricing Dashboard
-            </span>
-            <button id="fs-btn" onclick="toggleFullScreen()" title="Pantalla Completa" style="
-                background-color: #1b4332; 
-                color: #ffffff; 
-                border: none; 
-                border-radius: 5px;
-                width: 26px; 
-                height: 24px; 
-                font-size: 13px; 
-                cursor: pointer;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.1); 
-                display: flex; 
-                align-items: center; 
-                justify-content: center;
-                transition: background-color 0.2s;
-            ">
-                <span id="fs-icon">⛶</span>
-            </button>
-        </div>
-
-        <!-- Derecha: Metadata de autor y actualización -->
-        <div style="color: #64748b; font-size: 10.5px; text-align: right; white-space: nowrap; line-height: 1.15;">
-            <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i> &nbsp;•&nbsp; 
-            <span style="color: #94a3b8;">🕒 {update_time}</span>
-        </div>
-    </div>
-
-    <script>
-        function toggleFullScreen() {{
-            var doc = window.parent.document;
-            var btnIcon = document.getElementById("fs-icon");
-            if (!doc.fullscreenElement) {{
-                doc.documentElement.requestFullscreen().catch(err => console.log(err));
-                btnIcon.innerText = "🗗";
-            }} else {{
-                if (doc.exitFullscreen) {{
-                    doc.exitFullscreen();
-                    btnIcon.innerText = "⛶";
-                }}
-            }}
-        }}
-    </script>
-""", height=34)
+# --- HEADER SUPERIOR: TÍTULO A LA IZQUIERDA Y METADATA A LA DERECHA ---
+col_head_title, col_head_meta = st.columns([2.2, 1.8])
+with col_head_title:
+    st.markdown('<div style="font-size: 16px; font-weight: 800; color: #0f172a; padding-top: 2px; white-space: nowrap;">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
+with col_head_meta:
+    st.markdown(f'<div style="color: #64748b; font-size: 10.5px; text-align: right; padding-top: 4px; white-space: nowrap; line-height: 1.15;"><b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i> &nbsp;•&nbsp; <span style="color: #94a3b8;">🕒 {update_time}</span></div>', unsafe_allow_html=True)
 
 # --- KPIS TIPO CARDS POWER BI ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
@@ -361,13 +310,54 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- SELECTOR DE PESTAÑAS TÁCTIL ---
-vista_activa = st.radio(
-    "Selecciona la vista a explorar:",
-    options=["📊 Resumen & Evolución", "🎯 Benchmark & Previsión"],
-    horizontal=True,
-    label_visibility="collapsed"
-)
+# --- SELECTOR DE PÁGINAS Y BOTÓN DE PANTALLA COMPLETA TOTALMENTE CLICABLE AL COSTADO ---
+col_tabs, col_fs_btn = st.columns([8.2, 0.45])
+
+with col_tabs:
+    vista_activa = st.radio(
+        "Selecciona la vista a explorar:",
+        options=["📊 Resumen & Evolución", "🎯 Benchmark & Previsión"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+with col_fs_btn:
+    components.html("""
+        <div style="display: flex; justify-content: flex-end; align-items: center; height: 26px;">
+            <button id="fs-btn" onclick="toggleFullScreen()" title="Pantalla Completa" style="
+                background-color: #1b4332; 
+                color: #ffffff; 
+                border: none; 
+                border-radius: 5px;
+                width: 28px; 
+                height: 25px; 
+                font-size: 13px; 
+                cursor: pointer;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.12); 
+                display: flex; 
+                align-items: center; 
+                justify-content: center;
+                transition: background-color 0.2s;
+            ">
+                <span id="fs-icon">⛶</span>
+            </button>
+        </div>
+        <script>
+            function toggleFullScreen() {
+                var doc = window.parent.document;
+                var btnIcon = document.getElementById("fs-icon");
+                if (!doc.fullscreenElement) {
+                    doc.documentElement.requestFullscreen().catch(err => console.log(err));
+                    btnIcon.innerText = "🗗";
+                } else {
+                    if (doc.exitFullscreen) {
+                        doc.exitFullscreen();
+                        btnIcon.innerText = "⛶";
+                    }
+                }
+            }
+        </script>
+    """, height=28)
 
 # ==========================================================
 # HOJA 1: RESUMEN EJECUTIVO & EVOLUCIÓN
@@ -407,6 +397,11 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_KG_PCT'] = df_trend['KG_TOTALES'].pct_change() * 100
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
+
+    # Si es vista semanal general, por default solo se analizan las últimas 20 semanas (sin barra desplazadora)
+    if periodo_seleccionado == "Semanal" and not mes_en_drilldown:
+        if len(df_trend) > 20:
+            df_trend = df_trend.tail(20).reset_index(drop=True)
 
     # GRÁFICO SUPERIOR
     st.markdown(f'<div class="chart-header">📈 {titulo_grafico}</div>', unsafe_allow_html=True)
@@ -451,6 +446,7 @@ if vista_activa == "📊 Resumen & Evolución":
             font=dict(color="#9a3412", size=8.5, family="Arial")
         ))
 
+    # DELIMITADORES DE ESTACIONES CON ESPACIADO HOLGADO PARA EVITAR COLISIONES CON LOS MESES
     if es_vista_mensual and not mes_en_drilldown:
         lista_meses = df_trend[col_actual].tolist()
         m_verano = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [1, 2, 3])]
@@ -463,58 +459,55 @@ if vista_activa == "📊 Resumen & Evolución":
                 return
             ini = meses_est[0]
             fin = meses_est[-1]
-            lineas_estaciones.append(dict(type="line", xref="x", yref="paper", x0=ini, x1=fin, y0=-0.14, y1=-0.14, line=dict(color="#94a3b8", width=1.2, dash="dot")))
-            lineas_estaciones.append(dict(type="line", xref="x", yref="paper", x0=ini, x1=ini, y0=-0.11, y1=-0.17, line=dict(color="#94a3b8", width=1.2)))
-            lineas_estaciones.append(dict(type="line", xref="x", yref="paper", x0=fin, x1=fin, y0=-0.11, y1=-0.17, line=dict(color="#94a3b8", width=1.2)))
+            
+            # Línea guía colocada en y=-0.22 (completamente por debajo de las etiquetas de los meses)
+            lineas_estaciones.append(dict(
+                type="line", xref="x", yref="paper",
+                x0=ini, x1=fin, y0=-0.22, y1=-0.22,
+                line=dict(color="#94a3b8", width=1.2, dash="dot")
+            ))
+            # Topes verticales delimitadores
+            lineas_estaciones.append(dict(
+                type="line", xref="x", yref="paper",
+                x0=ini, x1=ini, y0=-0.18, y1=-0.26,
+                line=dict(color="#94a3b8", width=1.2)
+            ))
+            lineas_estaciones.append(dict(
+                type="line", xref="x", yref="paper",
+                x0=fin, x1=fin, y0=-0.18, y1=-0.26,
+                line=dict(color="#94a3b8", width=1.2)
+            ))
+            
+            # Nombre de la estación colocado en y=-0.36 con suficiente respiro visual
             idx_med = int(round((lista_meses.index(ini) + lista_meses.index(fin)) / 2))
-            anotaciones_totales.append(dict(x=lista_meses[idx_med], y=-0.23, xref='x', yref='paper', text=f"<b>{nombre_est}</b>", showarrow=False, font=dict(size=9.5, color=color_txt, family='Arial')))
+            anotaciones_totales.append(dict(
+                x=lista_meses[idx_med], y=-0.36, xref='x', yref='paper',
+                text=f"<b>{nombre_est}</b>", showarrow=False,
+                font=dict(size=9.5, color=color_txt, family='Arial')
+            ))
 
         agregar_delimitador_estacion(m_verano, "☀️ Verano", "#854d0e")
         agregar_delimitador_estacion(m_otono, "🍂 Otoño", "#9a3412")
         agregar_delimitador_estacion(m_invierno, "❄️ Invierno", "#0369a1")
         agregar_delimitador_estacion(m_primavera, "🌸 Primavera", "#15803d")
 
-    # CONFIGURACIÓN DEL EJE X CON ENFOQUE EN LAS ÚLTIMAS 20 SEMANAS Y BARRA DESPLAZADORA CLÁSICA
-    xaxis_config = dict(
-        title='',
-        tickangle=-35 if (periodo_seleccionado == "Semanal" or mes_en_drilldown) else 0,
-        tickfont=dict(size=9)
-    )
-
-    es_semanal_general = (periodo_seleccionado == "Semanal" and not mes_en_drilldown)
-    if es_semanal_general:
-        total_puntos = len(df_trend)
-        semanas_lista = df_trend[col_actual].tolist()
-        
-        # Barra deslizadora (scrollbar / rangeslider clásico)
-        xaxis_config['rangeslider'] = dict(
-            visible=True,
-            thickness=0.08,
-            bgcolor="#f8fafc",
-            bordercolor="#94a3b8",
-            borderwidth=1
-        )
-        
-        # Por defecto muestra las últimas 20 semanas
-        if total_puntos > 20:
-            xaxis_config['range'] = [semanas_lista[-20], semanas_lista[-1]]
-        elif total_puntos > 0:
-            xaxis_config['range'] = [semanas_lista[0], semanas_lista[-1]]
-    else:
-        xaxis_config['rangeslider'] = dict(visible=False)
-
     fig_dual.update_layout(
         autosize=True,
         clickmode='event+select',
-        xaxis=xaxis_config,
+        xaxis=dict(
+            title='',
+            tickangle=-35 if (periodo_seleccionado == "Semanal" or mes_en_drilldown) else 0,
+            tickfont=dict(size=9),
+            rangeslider=dict(visible=False)  # Sin barra desplazadora
+        ),
         yaxis=dict(title='Volumen (Tn)', showgrid=False, titlefont=dict(size=9.5), tickfont=dict(size=8.5)),
         yaxis2=dict(title='Precio S/ /kg', overlaying='y', side='right', showgrid=True, titlefont=dict(size=9.5), tickfont=dict(size=8.5)),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=9)),
         template='plotly_white',
         shapes=lineas_estaciones,
         annotations=anotaciones_totales,
-        height=260 if es_semanal_general else 235,
-        margin=dict(t=20, b=45 if (es_vista_mensual and not mes_en_drilldown) else (35 if es_semanal_general else 20), l=8, r=8)
+        height=245,
+        margin=dict(t=20, b=65 if (es_vista_mensual and not mes_en_drilldown) else 25, l=8, r=8)  # Margen b=65 para holgura de estaciones
     )
 
     chart_key = "grafico_mensual_click" if not mes_en_drilldown else "grafico_semanal_view"
@@ -631,7 +624,7 @@ else:
         text_mkt_intercalado = [f"<b>S/{val:.2f}</b>" if (pd.notna(val) and ((idx+1)%2 != 0 or (idx+1)==11)) else "" for idx, val in enumerate(mkt_2026_real[:11])]
         text_kco_intercalado = [f"<b>S/{val:.2f}</b>" if (pd.notna(val) and ((idx+1)%2 == 0 or (idx+1)==11)) else "" for idx, val in enumerate(kco_2026_real[:11])]
 
-        # 1. GRÁFICO BENCHMARK ANUAL (220px)
+        # 1. GRÁFICO BENCHMARK ANUAL (215px)
         st.markdown('<div class="chart-header">🎯 Comparativo Anual de Precios: Mayorista vs KCO Retail & Previsión a Diciembre</div>', unsafe_allow_html=True)
         fig_anual = go.Figure()
 

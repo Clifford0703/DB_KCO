@@ -1,7 +1,7 @@
 streamlit>=1.35.0
-pandas
-plotly
-openpyxl
-xlrd
+pandas>=2.0.0
+plotly==5.19.0
+openpyxl==3.1.2
+xlrd==2.0.1
 numpy
 statsmodels

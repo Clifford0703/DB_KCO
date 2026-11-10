@@ -282,16 +282,17 @@ def style_semaphore(val):
 def load_all_data():
     file_path = "Ordenes.xls"
     try:
-        xls = pd.ExcelFile(file_path, engine='xlrd')
+        df = pd.read_excel(file_path, engine="xlrd")
     except Exception:
         try:
-            xls = pd.ExcelFile(file_path, engine='openpyxl')
+            df = pd.read_excel(file_path, engine="calamine")
         except Exception:
-            xls = pd.ExcelFile(file_path)
+            try:
+                df = pd.read_excel(file_path, engine="openpyxl")
+            except Exception:
+                df = pd.read_excel(file_path)
             
-    df = pd.read_excel(file_path, sheet_name=xls.sheet_names[0])
     df = df.loc[:, ~df.columns.duplicated()]
-
     df['FECHA_EMISION'] = pd.to_datetime(df['FECHA_EMISION'], format='%d-%m-%Y', errors='coerce')
     df['MES_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-%m')
     df['SEMANA_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-W%V')
@@ -313,10 +314,12 @@ def load_all_data():
     if os.path.exists(mkt_file):
         try:
             try:
-                mkt_xls = pd.ExcelFile(mkt_file, engine='xlrd')
+                df_m = pd.read_excel(mkt_file, engine='xlrd')
             except Exception:
-                mkt_xls = pd.ExcelFile(mkt_file, engine='openpyxl')
-            df_m = pd.read_excel(mkt_file, sheet_name=mkt_xls.sheet_names[0])
+                try:
+                    df_m = pd.read_excel(mkt_file, engine='calamine')
+                except Exception:
+                    df_m = pd.read_excel(mkt_file, engine='openpyxl')
             df_m['Fecha'] = pd.to_datetime(df_m['Fecha'], errors='coerce')
             df_m = df_m.dropna(subset=['Fecha', 'Palta Fuerte']).sort_values('Fecha')
             df_m['MES_AÑO'] = df_m['Fecha'].dt.strftime('%Y-%m')
@@ -500,8 +503,7 @@ if vista_activa == "📊 Resumen & Evolución":
         df_target = df.copy()
         col_actual = col_periodo
         label_actual = label_periodo
-        hint = " — (Toca o haz clic en una barra para ver sus semanas)" if es_vista_mensual else ""
-        titulo_grafico = f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/){hint}"
+        titulo_grafico = f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)"
 
     df_trend = df_target.groupby(col_actual).agg(
         KG_TOTALES=('KILOS_SOLICITADOS', 'sum'),
@@ -519,7 +521,7 @@ if vista_activa == "📊 Resumen & Evolución":
     st.subheader(titulo_grafico)
     fig_dual = go.Figure()
 
-    # Barras de Volumen
+    # Barras de Volumen: Texto nítido oscuro y visible
     fig_dual.add_trace(go.Bar(
         x=df_trend[col_actual],
         y=df_trend['TN_TOTALES'],
@@ -530,7 +532,8 @@ if vista_activa == "📊 Resumen & Evolución":
         ),
         text=df_trend['TN_TOTALES'].apply(lambda x: f"<b>{x:,.1f} Tn</b>"),
         textposition='outside',
-        outsidetextfont=dict(color='#0f172a', size=11, family="Arial"),
+        cliponaxis=False,
+        outsidetextfont=dict(color='#064e3b', size=11.5, family="Arial"),
         hovertemplate=(
             f"<b>{label_actual}: %{{x}}</b><br>" +
             "📦 Volumen Solicitado: <b>%{y:.2f} Tn</b> (%{customdata[0]:,.0f} kg)<br>" +
@@ -543,16 +546,13 @@ if vista_activa == "📊 Resumen & Evolución":
         yaxis='y'
     ))
 
-    # Línea de Precio Ponderado
+    # Línea de Precio Ponderado: Marcadores ámbar sólidos
     fig_dual.add_trace(go.Scatter(
         x=df_trend[col_actual],
         y=df_trend['PRECIO_POND'],
         name='Precio Pond. (S/)',
-        mode='lines+markers+text',
-        text=df_trend['PRECIO_POND'].apply(lambda x: f"<b>S/{x:.2f}</b>"),
-        textposition='top center',
-        textfont=dict(color='#b45309', size=11, family="Arial"),
-        marker=dict(size=9, color=COLOR_ACCENT),
+        mode='lines+markers',
+        marker=dict(size=9, color=COLOR_ACCENT, line=dict(color="#ffffff", width=1.5)),
         line=dict(width=3.2, color=COLOR_ACCENT),
         hovertemplate=(
             f"<b>{label_actual}: %{{x}}</b><br>" +
@@ -561,8 +561,29 @@ if vista_activa == "📊 Resumen & Evolución":
         yaxis='y2'
     ))
 
-    anotaciones_estaciones = []
+    anotaciones_totales = []
     lineas_estaciones = []
+
+    # ETIQUETAS DE PRECIO PONDERADO EN FORMATO BADGE / PILL (ALTO CONTRASTE Y FONDO DESTACADO)
+    for idx_row, row in df_trend.iterrows():
+        p_val = row['PRECIO_POND']
+        x_val = row[col_actual]
+        anotaciones_totales.append(dict(
+            x=x_val,
+            y=p_val,
+            xref='x',
+            yref='y2',
+            text=f"<b>S/{p_val:.2f}</b>",
+            showarrow=True,
+            arrowhead=0,
+            arrowcolor='rgba(0,0,0,0)',
+            yshift=14,
+            bgcolor="#fffbeb",          # Fondo cremoso de alto contraste
+            bordercolor="#d97706",      # Borde cobrizo de la línea de precio
+            borderwidth=1.2,
+            borderpad=3,
+            font=dict(color="#9a3412", size=11, family="Arial")
+        ))
 
     # Delimitadores de Estaciones en vista mensual general
     if es_vista_mensual and not mes_en_drilldown:
@@ -600,7 +621,7 @@ if vista_activa == "📊 Resumen & Evolución":
             idx_med = int(round((idx_ini + idx_fin) / 2))
             med_mes = lista_meses[idx_med]
             
-            anotaciones_estaciones.append(dict(
+            anotaciones_totales.append(dict(
                 x=med_mes, y=-0.23, xref='x', yref='paper',
                 text=f"<b>{nombre_est}</b>", showarrow=False,
                 font=dict(size=11, color=color_txt, family='Arial')
@@ -620,7 +641,7 @@ if vista_activa == "📊 Resumen & Evolución":
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         template='plotly_white',
         shapes=lineas_estaciones,
-        annotations=anotaciones_estaciones,
+        annotations=anotaciones_totales,
         height=470,
         margin=dict(t=40, b=80 if (es_vista_mensual and not mes_en_drilldown) else 45, l=10, r=10)
     )
@@ -637,7 +658,7 @@ if vista_activa == "📊 Resumen & Evolución":
         selection_mode="points"
     )
 
-    # PROCESAMIENTO ROBUSTO DEL CLIC
+    # PROCESAMIENTO DEL CLIC
     if es_vista_mensual and not mes_en_drilldown and chart_event:
         sel = chart_event.get("selection", {})
         pts = sel.get("points", [])
@@ -645,12 +666,10 @@ if vista_activa == "📊 Resumen & Evolución":
         mes_detectado = None
         if pts and len(pts) > 0:
             p0 = pts[0]
-            # 1. Intento por índice posicional (100% inmune a formatos de fecha de Plotly)
             idx = p0.get("point_index")
             if idx is not None and 0 <= idx < len(df_trend):
                 mes_detectado = df_trend[col_actual].iloc[idx]
             
-            # 2. Intento por valor 'x' directo
             if not mes_detectado:
                 x_val = str(p0.get("x", "")).strip()
                 if x_val in df_trend[col_actual].values:

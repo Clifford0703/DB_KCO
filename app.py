@@ -285,7 +285,7 @@ if df.empty:
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
-# --- HEADER TIPO POWER BI ---
+# --- HEADER TIPO POWER BI: TÍTULO A LA IZQUIERDA, AUTOR + BOTÓN SOLO ÍCONO A LA DERECHA ---
 head_col_left, head_col_right = st.columns([1.8, 2.2])
 
 with head_col_left:
@@ -293,32 +293,29 @@ with head_col_left:
 
 with head_col_right:
     components.html(f"""
-        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 14px; height: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; height: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
             <div style="color: #64748b; font-size: 11px; text-align: right; line-height: 1.2;">
                 <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i><br>
                 <span style="color: #94a3b8; font-size: 10px;">🕒 Act: {update_time}</span>
             </div>
-            <button id="fs-btn" onclick="toggleFullScreen()" style="
+            <button id="fs-btn" onclick="toggleFullScreen()" title="Pantalla Completa" style="
                 background-color: #1b4332; color: #ffffff; border: none; border-radius: 6px;
-                padding: 5px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 5px;
+                width: 32px; height: 30px; font-size: 14px; cursor: pointer;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: center;
             ">
-                <span id="fs-icon">⛶</span> <span id="fs-text">Pantalla Completa</span>
+                <span id="fs-icon">⛶</span>
             </button>
         </div>
         <script>
             function toggleFullScreen() {{
                 var doc = window.parent.document;
-                var btnText = document.getElementById("fs-text");
                 var btnIcon = document.getElementById("fs-icon");
                 if (!doc.fullscreenElement) {{
                     doc.documentElement.requestFullscreen().catch(err => console.log(err));
-                    btnText.innerText = "Salir";
                     btnIcon.innerText = "🗗";
                 }} else {{
                     if (doc.exitFullscreen) {{
                         doc.exitFullscreen();
-                        btnText.innerText = "Pantalla Completa";
                         btnIcon.innerText = "⛶";
                     }}
                 }}
@@ -567,7 +564,7 @@ if vista_activa == "📊 Resumen & Evolución":
         )
 
 # ==========================================================
-# HOJA 2: BENCHMARK & PREVISIÓN (CON MATRIZ HISTÓRICA RESTABLECIDA)
+# HOJA 2: BENCHMARK & PREVISIÓN
 # ==========================================================
 else:
     meses_nombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic']
@@ -659,7 +656,7 @@ else:
         with c_p3:
             st.markdown(f'<div class="metric-card" style="border-left-color: #d97706;"><div class="metric-title">KCO Cotización Sugerida (Dic Proy)</div><div class="metric-value">S/ {kco_dic_pred:.2f} /kg</div><div class="metric-sub">Rango: S/ {kco_dic_pred - 0.30:.2f} - S/ {kco_dic_pred + 0.30:.2f}</div></div>', unsafe_allow_html=True)
 
-        # 3. FILA MEDIA: BANDA DE NEGOCIACIÓN + AUDITORÍA DE VARIACIONES (220px)
+        # 3. FILA MEDIA: BANDA DE NEGOCIACIÓN + AUDITORÍA DE VARIACIONES
         col_b1, col_b2 = st.columns([1.1, 1.4])
         with col_b1:
             st.markdown('<div class="chart-header">🎯 Banda de Negociación por Variedad</div>', unsafe_allow_html=True)
@@ -679,7 +676,7 @@ else:
             fig_banda.update_layout(autosize=True, template='plotly_white', height=210, showlegend=False, yaxis=dict(title='Precio S/ /kg', titlefont=dict(size=9), tickfont=dict(size=8.5)), xaxis=dict(tickfont=dict(size=8.5)), margin=dict(t=12, b=15, l=8, r=8))
             st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
 
-        # Cálculo de cambios históricos de precio
+        # Cálculo de cambios de precio
         df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(KG=('KILOS_SOLICITADOS', 'sum'), VALOR=('VALOR_COMERCIAL', 'sum')).reset_index()
         df_prod_trend['PRECIO_POND'] = df_prod_trend['VALOR'] / df_prod_trend['KG']
         df_prod_trend = df_prod_trend.sort_values(by=['DESCRIPCION_PRODUCTO', col_periodo])
@@ -702,14 +699,8 @@ else:
             else:
                 st.info("Sin variaciones en el periodo.")
 
-        # 4. MATRIZ HISTÓRICA RESTABLECIDA EN PESTAÑAS DEDICADAS
-        st.markdown('<div class="chart-header">📑 Tablas de Detalle: Matriz de Historial de Precios & Órdenes</div>', unsafe_allow_html=True)
-        sub_tab1, sub_tab2 = st.tabs([
-            "📋 Matriz de Historial de Cambios de Precio", 
-            "📦 Detalle General de Órdenes & Estimaciones"
-        ])
-
-        with sub_tab1:
+        # 4. MATRIZ DE HISTORIAL DE CAMBIOS DE PRECIO EN PESTAÑA DESPLEGABLE (EXPANDER)
+        with st.expander("📋 Ver Matriz Histórica de Cambios de Precio"):
             if not df_changes.empty:
                 tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
                 tbl_c.columns = [label_periodo, 'Producto', 'Precio Anterior', 'Precio Actual', 'Diferencia S/', 'Variación %', 'Kilos del Periodo']
@@ -722,23 +713,7 @@ else:
                         'Kilos del Periodo': '{:,.0f} kg'
                     })
                     .map(style_semaphore, subset=['Variación %', 'Diferencia S/']),
-                    use_container_width=True, height=210, hide_index=True
+                    use_container_width=True, height=220, hide_index=True
                 )
             else:
                 st.info("No hay variaciones de precios registradas en el rango seleccionado.")
-
-        with sub_tab2:
-            cols_grid = ['NRO_OC', 'FECHA_EMISION', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PRECIO_KG', 'VALOR_COMERCIAL', 'JABAS_EST', 'FRUTOS_EST']
-            df_grid = df[cols_grid].copy()
-            df_grid['FECHA_EMISION'] = df_grid['FECHA_EMISION'].dt.strftime('%d-%m-%Y')
-            
-            st.dataframe(
-                df_grid.style.format({
-                    'KILOS_SOLICITADOS': '{:,.0f} kg',
-                    'PRECIO_KG': 'S/ {:.2f}',
-                    'VALOR_COMERCIAL': 'S/ {:,.2f}',
-                    'JABAS_EST': '{:,.1f}',
-                    'FRUTOS_EST': '{:,.0f}'
-                }),
-                use_container_width=True, height=210, hide_index=True
-            )

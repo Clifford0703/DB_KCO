@@ -32,49 +32,23 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#16a34a'
 }
 
-# --- ESTILOS CSS CON HEADER INTEGRADO EN EL BORDE SUPERIOR ---
+# --- ESTILOS CSS TIPO POWER BI ---
 st.markdown(f"""
     <style>
-    /* 1. Anular el espacio superior vacío de Streamlit */
     header[data-testid="stHeader"] {{
         background: transparent !important;
         height: 0px !important;
         z-index: 99 !important;
     }}
-    
     .main {{ 
         background-color: #f8fafc; 
     }}
-    
     .block-container {{
         max-width: 100% !important;
-        padding-top: 0.2rem !important;  /* Empieza exactamente pegado al borde superior */
+        padding-top: 0.15rem !important;
         padding-bottom: 0.5rem !important;
         padding-left: 0.7rem !important;
         padding-right: 0.7rem !important;
-    }}
-    
-    /* 2. Barra Superior Unificada al borde de la pantalla */
-    .top-navbar {{
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #ffffff;
-        padding: 4px 12px;
-        border-radius: 6px;
-        border: 1px solid #e2e8f0;
-        margin-top: 0px;
-        margin-bottom: 5px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-    }}
-    .top-title {{
-        font-size: 16px;
-        font-weight: 800;
-        color: #0f172a;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        white-space: nowrap;
     }}
     
     .chart-header {{
@@ -88,7 +62,6 @@ st.markdown(f"""
         gap: 5px;
     }}
 
-    /* KPIs Compactos estilo Power BI */
     .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -292,43 +265,63 @@ if df.empty:
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
-# --- BARRA SUPERIOR TOTALMENTE INTEGRADA AL BORDE SUPERIOR ---
-head_col_left, head_col_right = st.columns([2.1, 1.9])
-
-with head_col_left:
-    st.markdown('<div class="top-title">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
-
-with head_col_right:
-    components.html(f"""
-        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; height: 28px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-            <div style="color: #64748b; font-size: 10.5px; text-align: right; line-height: 1.15;">
-                <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i> &nbsp;•&nbsp; 
-                <span style="color: #94a3b8;">🕒 {update_time}</span>
-            </div>
+# --- HEADER UNIFICADO: TÍTULO CON BOTÓN DE PANTALLA COMPLETA AL COSTADO Y AUTOR A LA DERECHA ---
+components.html(f"""
+    <div style="
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        height: 32px; 
+        padding: 0 4px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    ">
+        <!-- Izquierda: Título y botón al costado -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px; font-weight: 800; color: #0f172a; white-space: nowrap;">
+                🥑 KCO Group | Intelligence & Pricing Dashboard
+            </span>
             <button id="fs-btn" onclick="toggleFullScreen()" title="Pantalla Completa" style="
-                background-color: #1b4332; color: #ffffff; border: none; border-radius: 5px;
-                width: 28px; height: 26px; font-size: 13px; cursor: pointer;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;
+                background-color: #1b4332; 
+                color: #ffffff; 
+                border: none; 
+                border-radius: 5px;
+                width: 26px; 
+                height: 24px; 
+                font-size: 13px; 
+                cursor: pointer;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.1); 
+                display: flex; 
+                align-items: center; 
+                justify-content: center;
+                transition: background-color 0.2s;
             ">
                 <span id="fs-icon">⛶</span>
             </button>
         </div>
-        <script>
-            function toggleFullScreen() {{
-                var doc = window.parent.document;
-                var btnIcon = document.getElementById("fs-icon");
-                if (!doc.fullscreenElement) {{
-                    doc.documentElement.requestFullscreen().catch(err => console.log(err));
-                    btnIcon.innerText = "🗗";
-                }} else {{
-                    if (doc.exitFullscreen) {{
-                        doc.exitFullscreen();
-                        btnIcon.innerText = "⛶";
-                    }}
+
+        <!-- Derecha: Metadata de autor y actualización -->
+        <div style="color: #64748b; font-size: 10.5px; text-align: right; white-space: nowrap; line-height: 1.15;">
+            <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i> &nbsp;•&nbsp; 
+            <span style="color: #94a3b8;">🕒 {update_time}</span>
+        </div>
+    </div>
+
+    <script>
+        function toggleFullScreen() {{
+            var doc = window.parent.document;
+            var btnIcon = document.getElementById("fs-icon");
+            if (!doc.fullscreenElement) {{
+                doc.documentElement.requestFullscreen().catch(err => console.log(err));
+                btnIcon.innerText = "🗗";
+            }} else {{
+                if (doc.exitFullscreen) {{
+                    doc.exitFullscreen();
+                    btnIcon.innerText = "⛶";
                 }}
             }}
-        </script>
-    """, height=30)
+        }}
+    </script>
+""", height=34)
 
 # --- KPIS TIPO CARDS POWER BI ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
@@ -415,7 +408,7 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # GRÁFICO SUPERIOR (CON VENTANA DESLIZABLE EN VISTA SEMANAL)
+    # GRÁFICO SUPERIOR
     st.markdown(f'<div class="chart-header">📈 {titulo_grafico}</div>', unsafe_allow_html=True)
     fig_dual = go.Figure()
 
@@ -481,28 +474,32 @@ if vista_activa == "📊 Resumen & Evolución":
         agregar_delimitador_estacion(m_invierno, "❄️ Invierno", "#0369a1")
         agregar_delimitador_estacion(m_primavera, "🌸 Primavera", "#15803d")
 
-    # CONFIGURACIÓN DEL EJE X CON VENTANA DE ÚLTIMAS 20 SEMANAS Y BARRA DESLIZABLE (SLIDER)
+    # CONFIGURACIÓN DEL EJE X CON ENFOQUE EN LAS ÚLTIMAS 20 SEMANAS Y BARRA DESPLAZADORA CLÁSICA
     xaxis_config = dict(
         title='',
         tickangle=-35 if (periodo_seleccionado == "Semanal" or mes_en_drilldown) else 0,
         tickfont=dict(size=9)
     )
-    
-    # Si la vista es Semanal (general), se muestran las últimas 20 semanas y se activa el rangeslider
-    if periodo_seleccionado == "Semanal" and not mes_en_drilldown:
-        total_semanas = len(df_trend[col_actual])
-        if total_semanas > 20:
-            semanas_lista = df_trend[col_actual].tolist()
+
+    es_semanal_general = (periodo_seleccionado == "Semanal" and not mes_en_drilldown)
+    if es_semanal_general:
+        total_puntos = len(df_trend)
+        semanas_lista = df_trend[col_actual].tolist()
+        
+        # Barra deslizadora (scrollbar / rangeslider clásico)
+        xaxis_config['rangeslider'] = dict(
+            visible=True,
+            thickness=0.08,
+            bgcolor="#f8fafc",
+            bordercolor="#94a3b8",
+            borderwidth=1
+        )
+        
+        # Por defecto muestra las últimas 20 semanas
+        if total_puntos > 20:
             xaxis_config['range'] = [semanas_lista[-20], semanas_lista[-1]]
-            xaxis_config['rangeslider'] = dict(
-                visible=True,
-                thickness=0.06,
-                bgcolor="#f1f5f9",
-                bordercolor="#cbd5e1",
-                borderwidth=1
-            )
-        else:
-            xaxis_config['rangeslider'] = dict(visible=False)
+        elif total_puntos > 0:
+            xaxis_config['range'] = [semanas_lista[0], semanas_lista[-1]]
     else:
         xaxis_config['rangeslider'] = dict(visible=False)
 
@@ -516,8 +513,8 @@ if vista_activa == "📊 Resumen & Evolución":
         template='plotly_white',
         shapes=lineas_estaciones,
         annotations=anotaciones_totales,
-        height=250 if (periodo_seleccionado == "Semanal" and not mes_en_drilldown) else 235,
-        margin=dict(t=20, b=45 if (es_vista_mensual and not mes_en_drilldown) else 20, l=8, r=8)
+        height=260 if es_semanal_general else 235,
+        margin=dict(t=20, b=45 if (es_vista_mensual and not mes_en_drilldown) else (35 if es_semanal_general else 20), l=8, r=8)
     )
 
     chart_key = "grafico_mensual_click" if not mes_en_drilldown else "grafico_semanal_view"

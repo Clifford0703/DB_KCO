@@ -368,7 +368,7 @@ if df.empty:
     st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
     st.stop()
 
-# Si se cambia el radio de agrupación a Semanal desde el sidebar, se reinicia cualquier drilldown
+# Reiniciar drilldown si el usuario cambia el radio a Semanal
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
@@ -469,14 +469,14 @@ vista_activa = st.radio(
 st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
 
 # ==========================================================
-# VISTA 1: RESUMEN EJECUTIVO & EVOLUCIÓN PERIÓDICA CON DRILL-DOWN
+# VISTA 1: RESUMEN EJECUTIVO & EVOLUCIÓN PERIÓDICA CON DRILL-DOWN NATIVO
 # ==========================================================
 if vista_activa == "📊 Resumen & Evolución":
     
     es_vista_mensual = (periodo_seleccionado == "Mensual")
     mes_en_drilldown = st.session_state.drilldown_mes if es_vista_mensual else None
 
-    # Miga de pan / Botón de retorno exclusivo cuando se está dentro de un mes
+    # Botón de retorno cuando se encuentra dentro de un mes
     if es_vista_mensual and mes_en_drilldown:
         col_bread1, col_bread2 = st.columns([3, 1])
         with col_bread1:
@@ -625,8 +625,8 @@ if vista_activa == "📊 Resumen & Evolución":
         margin=dict(t=40, b=80 if (es_vista_mensual and not mes_en_drilldown) else 45, l=10, r=10)
     )
 
-    # CAPTURA ROBUSTA DEL CLIC MEDIANTE KEY Y STREAMLIT SELECTION
-    chart_key = "grafico_mensual_interactivo" if not mes_en_drilldown else "grafico_semanal_drilldown"
+    # CAPTURA EXACTA DE CLIC POR ÍNDICE POSICIONAL (point_index)
+    chart_key = "grafico_mensual_click" if not mes_en_drilldown else "grafico_semanal_view"
     
     chart_event = st.plotly_chart(
         fig_dual,
@@ -637,15 +637,28 @@ if vista_activa == "📊 Resumen & Evolución":
         selection_mode="points"
     )
 
-    # Si estamos en la vista mensual y el usuario hace clic en una barra
+    # PROCESAMIENTO ROBUSTO DEL CLIC
     if es_vista_mensual and not mes_en_drilldown and chart_event:
-        selection_data = chart_event.get("selection", {})
-        points = selection_data.get("points", [])
-        if points:
-            mes_seleccionado = points[0].get("x")
-            if mes_seleccionado and mes_seleccionado in df['MES_AÑO'].unique():
-                st.session_state.drilldown_mes = mes_seleccionado
-                st.rerun()
+        sel = chart_event.get("selection", {})
+        pts = sel.get("points", [])
+        
+        mes_detectado = None
+        if pts and len(pts) > 0:
+            p0 = pts[0]
+            # 1. Intento por índice posicional (100% inmune a formatos de fecha de Plotly)
+            idx = p0.get("point_index")
+            if idx is not None and 0 <= idx < len(df_trend):
+                mes_detectado = df_trend[col_actual].iloc[idx]
+            
+            # 2. Intento por valor 'x' directo
+            if not mes_detectado:
+                x_val = str(p0.get("x", "")).strip()
+                if x_val in df_trend[col_actual].values:
+                    mes_detectado = x_val
+        
+        if mes_detectado and mes_detectado in df['MES_AÑO'].unique():
+            st.session_state.drilldown_mes = mes_detectado
+            st.rerun()
 
     max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
     max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]

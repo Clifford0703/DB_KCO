@@ -5,65 +5,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 import os
-import json
-import base64
 from datetime import datetime
 
-# --- 1. CONFIGURACIÓN DE PÁGINA ---
+# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
     page_title="Inteligencia Comercial & Pricing | KCO Group",
     page_icon="🥑",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# --- 2. CONFIGURACIÓN PWA Y MANIFIESTO PARA PWABUILDER / MÓVIL ---
-pwa_manifest = {
-    "name": "KCO Group Intelligence & Pricing",
-    "short_name": "KCO Pricing",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#f8fafc",
-    "theme_color": "#1b4332",
-    "description": "Dashboard comercial y de pricing de palta para KCO Group",
-    "icons": [
-        {
-            "src": "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f951.png",
-            "sizes": "72x72",
-            "type": "image/png"
-        },
-        {
-            "src": "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f951.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f951.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ]
-}
-
-manifest_json_str = json.dumps(pwa_manifest)
-manifest_b64 = base64.b64encode(manifest_json_str.encode('utf-8')).decode('utf-8')
-manifest_href = f"data:application/manifest+json;base64,{manifest_b64}"
-
-# Inyección en cabecera para PWA Standalone
-st.markdown(f"""
-    <head>
-        <link rel="manifest" href="{manifest_href}">
-        <meta name="mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="KCO Pricing">
-        <meta name="theme-color" content="#1b4332">
-        <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f951.png">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    </head>
-""", unsafe_allow_html=True)
-
-# --- 3. PALETA CORPORATIVA ---
+# --- PALETA CORPORATIVA ---
 COLOR_PRIMARY = "#1b4332"
 COLOR_SECONDARY = "#2d6a4f"
 COLOR_ACCENT = "#d97706"
@@ -79,7 +31,7 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#16a34a'
 }
 
-# --- 4. ESTILOS CSS FULL-WIDTH Y MOBILE-FIRST ---
+# --- ESTILOS CSS FULL-WIDTH Y MOBILE-FIRST ---
 st.markdown(f"""
     <style>
     .main {{ 
@@ -93,6 +45,7 @@ st.markdown(f"""
         padding-right: 1.2rem !important;
     }}
     
+    /* TÍTULO PRINCIPAL */
     .dashboard-title {{
         font-size: clamp(1.3rem, 2.8vw, 2.2rem) !important;
         font-weight: 800;
@@ -110,6 +63,7 @@ st.markdown(f"""
         font-size: clamp(1.1rem, 2vw, 1.4rem) !important;
     }}
 
+    /* GRID RESPONSIVO PARA KPIS */
     .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -171,16 +125,6 @@ st.markdown(f"""
         width: 100% !important;
     }}
     
-    .filter-box {{
-        background-color: #ffffff;
-        padding: 14px 18px;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 16px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-        width: 100% !important;
-    }}
-    
     .header-metadata {{
         display: flex;
         justify-content: space-between;
@@ -203,6 +147,7 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
+    /* CONTROL SEGMENTADO TÁCTIL */
     div[data-testid="stRadio"] > div {{
         background: #e2e8f0;
         padding: 4px;
@@ -231,6 +176,7 @@ st.markdown(f"""
         color: #ffffff !important;
     }}
 
+    /* MEDIA QUERIES: VISTA VERTICAL EN CELULAR */
     @media (max-width: 768px) and (orientation: portrait) {{
         .block-container {{
             padding-top: 3.2rem !important;
@@ -257,6 +203,7 @@ st.markdown(f"""
         }}
     }}
 
+    /* MEDIA QUERIES: VISTA HORIZONTAL EN CELULAR */
     @media (max-width: 950px) and (orientation: landscape) {{
         .block-container {{
             padding-top: 3.2rem !important;
@@ -281,7 +228,7 @@ PLOTLY_CONFIG = {
     'responsive': True
 }
 
-# --- 5. MAESTRO DE PRODUCTOS ---
+# --- MAESTRO DE PRODUCTOS ---
 PRODUCT_WEIGHTS = {
     'PALTA-FUERTE-A-KG': 0.250,
     'PALTA-FUERTE-V-KG': 0.280,
@@ -301,7 +248,7 @@ def style_semaphore(val):
     else:
         return 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'
 
-# --- 6. CARGA Y TRANSFORMACIÓN DE DATOS ---
+# --- CARGA Y TRANSFORMACIÓN DE DATOS ---
 @st.cache_data
 def load_all_data():
     file_path = "Ordenes.xls"
@@ -359,7 +306,48 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- 7. HEADER PRINCIPAL ---
+# --- SIDEBAR: FILTROS Y SEGMENTACIONES (DASHBOARD TRADICIONAL) ---
+with st.sidebar:
+    st.markdown("### 🎛️ Filtros & Segmentación")
+    st.markdown("---")
+    
+    min_date, max_date = df_raw['FECHA_EMISION'].min(), df_raw['FECHA_EMISION'].max()
+    date_range = st.date_input("📅 Periodo Histórico", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+    
+    prods = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
+    selected_prods = st.multiselect("🥑 Variedad / Calibre", options=prods, default=prods)
+    
+    formas_pago = sorted(df_raw['FORMA_PAGO'].dropna().unique().tolist())
+    selected_fp = st.multiselect("💳 Condición de Pago", options=formas_pago, default=formas_pago)
+    
+    st.markdown("---")
+    st.markdown("#### ⏱️ Agrupación Temporal")
+    periodo_seleccionado = st.radio(
+        "Ver datos por:",
+        options=["Mensual", "Semanal"],
+        horizontal=True
+    )
+    
+    st.markdown("---")
+    st.caption("KCO Group — Sistema de Gestión Comercial")
+
+col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
+label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
+
+# Filtrar data
+df = df_raw.copy()
+if len(date_range) == 2:
+    df = df[(df['FECHA_EMISION'] >= pd.to_datetime(date_range[0])) & (df['FECHA_EMISION'] <= pd.to_datetime(date_range[1]))]
+if selected_prods:
+    df = df[df['DESCRIPCION_PRODUCTO'].isin(selected_prods)]
+if selected_fp:
+    df = df[df['FORMA_PAGO'].isin(selected_fp)]
+
+if df.empty:
+    st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
+    st.stop()
+
+# --- HEADER PRINCIPAL ---
 st.markdown('<div class="dashboard-title">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
 
 st.markdown(f"""
@@ -373,7 +361,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- BOTÓN DE PANTALLA COMPLETA ---
+# BOTÓN DE PANTALLA COMPLETA DEBAJO DEL TÍTULO
 components.html("""
     <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 4px;">
         <button id="fs-btn" onclick="toggleFullScreen()" style="
@@ -407,45 +395,7 @@ components.html("""
 
 st.caption("Análisis estratégico de ventas, pricing y benchmark mayorista frente al mercado de Palta Fuerte.")
 
-# --- 8. FILTROS GLOBALES RESPONSIVE ---
-with st.expander("🔍 **Filtros y Segmentación de Datos** (Toca aquí para ajustar)", expanded=True):
-    f_row1, f_row2 = st.columns([2.5, 1.5])
-    with f_row1:
-        f1, f2, f3 = st.columns(3)
-        with f1:
-            min_date, max_date = df_raw['FECHA_EMISION'].min(), df_raw['FECHA_EMISION'].max()
-            date_range = st.date_input("Periodo Histórico", value=(min_date, max_date), min_value=min_date, max_value=max_date)
-        with f2:
-            prods = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
-            selected_prods = st.multiselect("Variedad / Calibre", options=prods, default=prods)
-        with f3:
-            formas_pago = sorted(df_raw['FORMA_PAGO'].dropna().unique().tolist())
-            selected_fp = st.multiselect("Condición de Pago", options=formas_pago, default=formas_pago)
-            
-    with f_row2:
-        periodo_seleccionado = st.radio(
-            "Agrupación Temporal:",
-            options=["Mensual", "Semanal"],
-            horizontal=True
-        )
-
-col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
-label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
-
-# Filtrar datos
-df = df_raw.copy()
-if len(date_range) == 2:
-    df = df[(df['FECHA_EMISION'] >= pd.to_datetime(date_range[0])) & (df['FECHA_EMISION'] <= pd.to_datetime(date_range[1]))]
-if selected_prods:
-    df = df[df['DESCRIPCION_PRODUCTO'].isin(selected_prods)]
-if selected_fp:
-    df = df[df['FORMA_PAGO'].isin(selected_fp)]
-
-if df.empty:
-    st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
-    st.stop()
-
-# --- 9. KPIS GLOBALES CON GRID RESPONSIVE ---
+# --- KPIS GLOBALES CON GRID RESPONSIVE ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -483,7 +433,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- 10. NAVEGACIÓN MOBILE-FIRST CON CONTROL SEGMENTADO ---
+# --- NAVEGACIÓN MOBILE-FIRST CON CONTROL SEGMENTADO TÁCTIL ---
 vista_activa = st.radio(
     "Selecciona la vista a explorar:",
     options=["📊 Resumen & Evolución", "🎯 Benchmark & Previsión"],
@@ -509,122 +459,124 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    col_g1, col_g2 = st.columns([1.6, 1])
+    # 1. GRÁFICO A TODO EL ANCHO: Evolución Mensual Volumen vs Precio Ponderado
+    st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
+    fig_dual = go.Figure()
 
-    with col_g1:
-        st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
-        fig_dual = go.Figure()
+    fig_dual.add_trace(go.Bar(
+        x=df_trend[col_periodo],
+        y=df_trend['TN_TOTALES'],
+        name='Volumen (Tn)',
+        marker_color=COLOR_SECONDARY,
+        text=df_trend['TN_TOTALES'].apply(lambda x: f"{x:,.1f} Tn"),
+        textposition='outside',
+        outsidetextfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
+        hovertemplate=(
+            f"<b>{label_periodo}: %{{x}}</b><br>" +
+            "📦 Volumen: %{y:.2f} Tn (%{customdata[0]:,.0f} kg)<br>" +
+            "📋 Órdenes de Compra: %{customdata[1]:,}<br>" +
+            "💰 Venta: S/ %{customdata[2]:,.2f}<extra></extra>"
+        ),
+        customdata=np.stack((df_trend['KG_TOTALES'], df_trend['ORDENES'], df_trend['VALOR_TOTAL']), axis=-1),
+        yaxis='y'
+    ))
 
-        fig_dual.add_trace(go.Bar(
-            x=df_trend[col_periodo],
-            y=df_trend['TN_TOTALES'],
-            name='Volumen (Tn)',
-            marker_color=COLOR_SECONDARY,
-            text=df_trend['TN_TOTALES'].apply(lambda x: f"{x:,.1f} Tn"),
-            textposition='outside',
-            outsidetextfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
-            hovertemplate=(
-                f"<b>{label_periodo}: %{{x}}</b><br>" +
-                "📦 Volumen: %{y:.2f} Tn (%{customdata[0]:,.0f} kg)<br>" +
-                "📋 Órdenes de Compra: %{customdata[1]:,}<br>" +
-                "💰 Venta: S/ %{customdata[2]:,.2f}<extra></extra>"
-            ),
-            customdata=np.stack((df_trend['KG_TOTALES'], df_trend['ORDENES'], df_trend['VALOR_TOTAL']), axis=-1),
-            yaxis='y'
-        ))
+    fig_dual.add_trace(go.Scatter(
+        x=df_trend[col_periodo],
+        y=df_trend['PRECIO_POND'],
+        name='Precio Pond. (S/)',
+        mode='lines+markers+text',
+        text=df_trend['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
+        textposition='top center',
+        textfont=dict(color='#b45309', size=11, family="Arial", weight="bold"),
+        marker=dict(size=8, color=COLOR_ACCENT),
+        line=dict(width=3, color=COLOR_ACCENT),
+        hovertemplate=(
+            f"<b>{label_periodo}: %{{x}}</b><br>" +
+            "🏷️ <b>Precio Ponderado: S/ %{y:.2f} /kg</b><extra></extra>"
+        ),
+        yaxis='y2'
+    ))
 
-        fig_dual.add_trace(go.Scatter(
-            x=df_trend[col_periodo],
-            y=df_trend['PRECIO_POND'],
-            name='Precio Pond. (S/)',
-            mode='lines+markers+text',
-            text=df_trend['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
-            textposition='top center',
-            textfont=dict(color='#b45309', size=11, family="Arial", weight="bold"),
-            marker=dict(size=8, color=COLOR_ACCENT),
-            line=dict(width=3, color=COLOR_ACCENT),
-            hovertemplate=(
-                f"<b>{label_periodo}: %{{x}}</b><br>" +
-                "🏷️ <b>Precio Ponderado: S/ %{y:.2f} /kg</b><extra></extra>"
-            ),
-            yaxis='y2'
-        ))
+    fig_dual.update_layout(
+        autosize=True,
+        xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
+        yaxis=dict(title='Volumen Total (Tn)', showgrid=False),
+        yaxis2=dict(title='Precio Pond. (S/ /kg)', overlaying='y', side='right', showgrid=True),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        template='plotly_white',
+        height=430,
+        margin=dict(t=35, b=25, l=10, r=10)
+    )
+    st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
+    
+    max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
+    max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
+    st.markdown(f"""
+    <div class="chart-insight">
+        💡 <b>Insight Comercial ({periodo_seleccionado}):</b> 
+        El pico de volumen se registró en <b>{max_vol_row[col_periodo]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs). 
+        El mayor precio ponderado se alcanzó en <b>{max_p_row[col_periodo]}</b> a <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b>.
+    </div>
+    """, unsafe_allow_html=True)
 
-        fig_dual.update_layout(
-            autosize=True,
-            xaxis=dict(title=label_periodo, tickangle=-45 if periodo_seleccionado == "Semanal" else 0),
-            yaxis=dict(title='Volumen Total (Tn)', showgrid=False),
-            yaxis2=dict(title='Precio Pond. (S/ /kg)', overlaying='y', side='right', showgrid=True),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            template='plotly_white',
-            height=400,
-            margin=dict(t=35, b=25, l=10, r=10)
-        )
-        st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
-        
-        max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
-        max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
-        st.markdown(f"""
-        <div class="chart-insight">
-            💡 <b>Insight Comercial ({periodo_seleccionado}):</b> 
-            El pico de volumen se registró en <b>{max_vol_row[col_periodo]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs). 
-            El mayor precio ponderado se alcanzó en <b>{max_p_row[col_periodo]}</b> a <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b>.
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("---")
 
-    with col_g2:
-        st.subheader("Mix y Concentración por Producto")
-        
-        df_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
-            VALOR=('VALOR_COMERCIAL', 'sum'),
-            KG=('KILOS_SOLICITADOS', 'sum'),
-            ORDENES=('NRO_OC', 'nunique')
-        ).reset_index().sort_values(by='VALOR', ascending=False)
-        
-        df_prod['PRECIO_POND'] = df_prod['VALOR'] / df_prod['KG']
-        df_prod['PART_VALOR'] = (df_prod['VALOR'] / valor_comercial_total) * 100
-        
-        hover_texts = [
-            f"🥑 <b>{row['DESCRIPCION_PRODUCTO']}</b><br><br>"
-            f"💰 <b>Venta:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
-            f"📦 <b>Volumen:</b> {row['KG']:,.0f} kg ({row['KG']/1000:,.1f} Tn)<br>"
-            f"🏷️ <b>Precio Ponderado:</b> S/ {row['PRECIO_POND']:.2f} /kg<br>"
-            f"📋 <b>Órdenes Únicas:</b> {row['ORDENES']:,} OCs"
-            for _, row in df_prod.iterrows()
-        ]
-        
-        pie_colors = [VARIEDAD_COLORS.get(prod, '#2d6a4f') for prod in df_prod['DESCRIPCION_PRODUCTO']]
-        
-        fig_pie = go.Figure(data=[go.Pie(
-            labels=df_prod['DESCRIPCION_PRODUCTO'],
-            values=df_prod['VALOR'],
-            hole=0.45,
-            marker=dict(colors=pie_colors),
-            textposition='inside',
-            textinfo='percent+label',
-            insidetextfont=dict(color='#ffffff', size=11, family="Arial", weight="bold"),
-            hoverinfo='text',
-            hovertext=hover_texts
-        )])
-        
-        fig_pie.update_layout(
-            autosize=True,
-            template='plotly_white',
-            showlegend=False,
-            height=400,
-            margin=dict(t=25, b=20, l=10, r=10)
-        )
-        st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
-        
-        top_prod = df_prod.iloc[0]
-        st.markdown(f"""
-        <div class="chart-insight">
-            📌 <b>Concentración de Portafolio:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{top_prod['PART_VALOR']:.1f}%</b> de la facturación (S/ {top_prod['VALOR']:,.0f}).
-        </div>
-        """, unsafe_allow_html=True)
+    # 2. GRÁFICO DEBAJO: Mix y Concentración por Producto
+    st.subheader("Mix y Concentración por Producto")
+    
+    df_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
+        VALOR=('VALOR_COMERCIAL', 'sum'),
+        KG=('KILOS_SOLICITADOS', 'sum'),
+        ORDENES=('NRO_OC', 'nunique')
+    ).reset_index().sort_values(by='VALOR', ascending=False)
+    
+    df_prod['PRECIO_POND'] = df_prod['VALOR'] / df_prod['KG']
+    df_prod['PART_VALOR'] = (df_prod['VALOR'] / valor_comercial_total) * 100
+    
+    hover_texts = [
+        f"🥑 <b>{row['DESCRIPCION_PRODUCTO']}</b><br><br>"
+        f"💰 <b>Venta:</b> S/ {row['VALOR']:,.2f} ({row['PART_VALOR']:.1f}%)<br>"
+        f"📦 <b>Volumen:</b> {row['KG']:,.0f} kg ({row['KG']/1000:,.1f} Tn)<br>"
+        f"🏷️ <b>Precio Ponderado:</b> S/ {row['PRECIO_POND']:.2f} /kg<br>"
+        f"📋 <b>Órdenes Únicas:</b> {row['ORDENES']:,} OCs"
+        for _, row in df_prod.iterrows()
+    ]
+    
+    pie_colors = [VARIEDAD_COLORS.get(prod, '#2d6a4f') for prod in df_prod['DESCRIPCION_PRODUCTO']]
+    
+    fig_pie = go.Figure(data=[go.Pie(
+        labels=df_prod['DESCRIPCION_PRODUCTO'],
+        values=df_prod['VALOR'],
+        hole=0.45,
+        marker=dict(colors=pie_colors),
+        textposition='inside',
+        textinfo='percent+label',
+        insidetextfont=dict(color='#ffffff', size=11, family="Arial", weight="bold"),
+        hoverinfo='text',
+        hovertext=hover_texts
+    )])
+    
+    fig_pie.update_layout(
+        autosize=True,
+        template='plotly_white',
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+        height=440,
+        margin=dict(t=25, b=25, l=10, r=10)
+    )
+    st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
+    
+    top_prod = df_prod.iloc[0]
+    st.markdown(f"""
+    <div class="chart-insight">
+        📌 <b>Concentración de Portafolio:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{top_prod['PART_VALOR']:.1f}%</b> de la facturación (S/ {top_prod['VALOR']:,.0f}).
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
     
+    # 3. MATRIZ PERIÓDICA DE VARIACIÓN
     st.subheader(f"📋 Matriz Periódica de Variación ({periodo_seleccionado})")
     st.caption("Semáforo: 🟢 Aumento > +2% | 🟡 Estable [-2%, +2%] | 🔴 Descenso < -2%")
     
@@ -1064,7 +1016,7 @@ else:
         use_container_width=True, height=320, hide_index=True
     )
 
-# --- 11. FOOTER INSTITUCIONAL ---
+# --- FOOTER INSTITUCIONAL ---
 st.markdown(f"""
     <div class="footer-credits">
         🥑 <b>KCO Group</b> — Plataforma de Inteligencia Comercial & Pricing &nbsp;|&nbsp; 

@@ -17,7 +17,7 @@ st.set_page_config(
 
 # --- PALETA CORPORATIVA ---
 COLOR_PRIMARY = "#1b4332"
-COLOR_BARRA_CLARA = "#52b788"      # Verde esmeralda luminoso
+COLOR_BARRA_CLARA = "#52b788"      # Verde esmeralda luminoso para barras
 COLOR_BARRA_BORDE = "#2d6a4f"      # Contorno contrastado
 COLOR_ACCENT = "#d97706"           # Línea de precio en ámbar
 COLOR_NEUTRAL = "#0f172a"
@@ -123,6 +123,21 @@ st.markdown(f"""
         margin-bottom: 16px;
         line-height: 1.45;
         width: 100% !important;
+    }}
+
+    /* BARRA DE DRILL-DOWN / BREADCRUMB */
+    .drilldown-bar {{
+        background: #e0f2fe;
+        border-left: 4px solid #0284c7;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #0369a1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
     }}
     
     .header-metadata {{
@@ -239,6 +254,10 @@ PLOTLY_CONFIG = {
     'responsive': True
 }
 
+# --- ESTADO DE SESIÓN PARA DRILL-DOWN ---
+if 'drilldown_mes' not in st.session_state:
+    st.session_state.drilldown_mes = None
+
 # --- MAESTRO DE PRODUCTOS ---
 PRODUCT_WEIGHTS = {
     'PALTA-FUERTE-A-KG': 0.250,
@@ -328,7 +347,7 @@ with st.sidebar:
     selected_prods = st.multiselect("🏷️ Variedad / Calibre", options=prods, default=prods)
     
     periodo_seleccionado = st.radio(
-        "⏱️ Agrupación Temporal",
+        "⏱️ Agrupación Temporal Base",
         options=["Mensual", "Semanal"],
         horizontal=True
     )
@@ -447,10 +466,45 @@ vista_activa = st.radio(
 st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
 
 # ==========================================================
-# VISTA 1: RESUMEN EJECUTIVO & EVOLUCIÓN PERIÓDICA
+# VISTA 1: RESUMEN EJECUTIVO & EVOLUCIÓN PERIÓDICA CON DRILL-DOWN
 # ==========================================================
 if vista_activa == "📊 Resumen & Evolución":
-    df_trend = df.groupby(col_periodo).agg(
+    
+    # CONTROL DE ESTADO DE DRILL-DOWN
+    es_vista_mensual = (periodo_seleccionado == "Mensual")
+    mes_en_drilldown = st.session_state.drilldown_mes if es_vista_mensual else None
+
+    # Botón / Miga de Pan para regresar a la vista general si hay drilldown activo
+    if es_vista_mensual and mes_en_drilldown:
+        col_bread1, col_bread2 = st.columns([3, 1])
+        with col_bread1:
+            st.markdown(f"""
+                <div class="drilldown-bar">
+                    <span>🔍 Analizando semanas del mes: <b>{mes_en_drilldown}</b></span>
+                    <span style="font-size:11px; color:#0369a1;">(Toca el botón a la derecha para ver todos los meses)</span>
+                </div>
+            """, unsafe_allow_html=True)
+        with col_bread2:
+            if st.button("⬅️ Ver todos los meses", use_container_width=True):
+                st.session_state.drilldown_mes = None
+                st.rerun()
+
+    # Preparamos el DataFrame según si estamos en modo general o modo Drill-Down de un mes
+    if es_vista_mensual and mes_en_drilldown:
+        # Modo Drill-Down: filtramos únicamente ese mes y agrupamos por SEMANA
+        df_target = df[df['MES_AÑO'] == mes_en_drilldown].copy()
+        col_actual = 'SEMANA_AÑO'
+        label_actual = f"Semana de {mes_en_drilldown}"
+        titulo_grafico = f"Desglose Semanal de {mes_en_drilldown}: Volumen (Tn) vs Precio Ponderado (S/)"
+    else:
+        # Modo General
+        df_target = df.copy()
+        col_actual = col_periodo
+        label_actual = label_periodo
+        sub_indicador = " [💡 Haz clic en una barra para ver sus semanas]" if es_vista_mensual else ""
+        titulo_grafico = f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/){sub_indicador}"
+
+    df_trend = df_target.groupby(col_actual).agg(
         KG_TOTALES=('KILOS_SOLICITADOS', 'sum'),
         VALOR_TOTAL=('VALOR_COMERCIAL', 'sum'),
         ORDENES=('NRO_OC', 'nunique')
@@ -462,13 +516,13 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # 1. GRÁFICO A TODO EL ANCHO: ESTACIONES DEBAJO DE LOS MESES SIN SUPERPOSICIÓN
-    st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
+    # 1. GRÁFICO A TODO EL ANCHO
+    st.subheader(titulo_grafico)
     fig_dual = go.Figure()
 
     # Barras de Volumen
     fig_dual.add_trace(go.Bar(
-        x=df_trend[col_periodo],
+        x=df_trend[col_actual],
         y=df_trend['TN_TOTALES'],
         name='Volumen (Tn)',
         marker=dict(
@@ -479,10 +533,12 @@ if vista_activa == "📊 Resumen & Evolución":
         textposition='outside',
         outsidetextfont=dict(color='#0f172a', size=11, family="Arial"),
         hovertemplate=(
-            f"<b>{label_periodo}: %{{x}}</b><br>" +
+            f"<b>{label_actual}: %{{x}}</b><br>" +
             "📦 Volumen Solicitado: <b>%{y:.2f} Tn</b> (%{customdata[0]:,.0f} kg)<br>" +
             "📋 Órdenes de Compra: %{customdata[1]:,}<br>" +
-            "💰 Facturación: S/ %{customdata[2]:,.2f}<extra></extra>"
+            "💰 Facturación: S/ %{customdata[2]:,.2f}<br>" +
+            ("👉 <i>Toca para ver el desglose semanal</i>" if (es_vista_mensual and not mes_en_drilldown) else "") +
+            "<extra></extra>"
         ),
         customdata=np.stack((df_trend['KG_TOTALES'], df_trend['ORDENES'], df_trend['VALOR_TOTAL']), axis=-1),
         yaxis='y'
@@ -490,7 +546,7 @@ if vista_activa == "📊 Resumen & Evolución":
 
     # Línea de Precio Ponderado
     fig_dual.add_trace(go.Scatter(
-        x=df_trend[col_periodo],
+        x=df_trend[col_actual],
         y=df_trend['PRECIO_POND'],
         name='Precio Pond. (S/)',
         mode='lines+markers+text',
@@ -500,7 +556,7 @@ if vista_activa == "📊 Resumen & Evolución":
         marker=dict(size=9, color=COLOR_ACCENT),
         line=dict(width=3.2, color=COLOR_ACCENT),
         hovertemplate=(
-            f"<b>{label_periodo}: %{{x}}</b><br>" +
+            f"<b>{label_actual}: %{{x}}</b><br>" +
             "🏷️ <b>Precio Ponderado: S/ %{y:.2f} /kg</b><extra></extra>"
         ),
         yaxis='y2'
@@ -509,9 +565,9 @@ if vista_activa == "📊 Resumen & Evolución":
     anotaciones_estaciones = []
     lineas_estaciones = []
 
-    # DELIMITADORES DE ESTACIONES UBICADOS DEBAJO DE LAS ETIQUETAS DEL EJE X
-    if periodo_seleccionado == "Mensual":
-        lista_meses = df_trend[col_periodo].tolist()
+    # Delimitadores de Estaciones (SOLO si estamos en vista mensual general)
+    if es_vista_mensual and not mes_en_drilldown:
+        lista_meses = df_trend[col_actual].tolist()
         
         m_verano = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [1, 2, 3])]
         m_otono = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [4, 5, 6])]
@@ -524,13 +580,11 @@ if vista_activa == "📊 Resumen & Evolución":
             ini = meses_est[0]
             fin = meses_est[-1]
             
-            # Línea guía horizontal por debajo de los nombres de los meses (y=-0.14)
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
                 x0=ini, x1=fin, y0=-0.14, y1=-0.14,
                 line=dict(color="#94a3b8", width=1.5, dash="dot")
             ))
-            # Topes verticales delimitadores
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
                 x0=ini, x1=ini, y0=-0.11, y1=-0.17,
@@ -542,13 +596,11 @@ if vista_activa == "📊 Resumen & Evolución":
                 line=dict(color="#94a3b8", width=1.5)
             ))
             
-            # Cálculo del punto medio de los meses
             idx_ini = lista_meses.index(ini)
             idx_fin = lista_meses.index(fin)
             idx_med = int(round((idx_ini + idx_fin) / 2))
             med_mes = lista_meses[idx_med]
             
-            # Nombre de la estación ubicado debajo de la línea guía (y=-0.23)
             anotaciones_estaciones.append(dict(
                 x=med_mes, y=-0.23, xref='x', yref='paper',
                 text=f"<b>{nombre_est}</b>", showarrow=False,
@@ -562,7 +614,7 @@ if vista_activa == "📊 Resumen & Evolución":
 
     fig_dual.update_layout(
         autosize=True,
-        xaxis=dict(title='', tickangle=-30 if periodo_seleccionado == "Semanal" else 0),
+        xaxis=dict(title='', tickangle=-30 if (periodo_seleccionado == "Semanal" or mes_en_drilldown) else 0),
         yaxis=dict(title='Volumen Total (Tn)', showgrid=False),
         yaxis2=dict(title='Precio Pond. (S/ /kg)', overlaying='y', side='right', showgrid=True),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -570,17 +622,51 @@ if vista_activa == "📊 Resumen & Evolución":
         shapes=lineas_estaciones,
         annotations=anotaciones_estaciones,
         height=470,
-        margin=dict(t=40, b=80, l=10, r=10)  # Margen b=80 da el espacio vertical exacto para que nada se choque
+        margin=dict(t=40, b=80 if (es_vista_mensual and not mes_en_drilldown) else 45, l=10, r=10)
     )
-    st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
-    
+
+    # DETECCIÓN DE CLIC EN LA BARRA (Streamlit >= 1.35 con fallback seguro)
+    try:
+        chart_event = st.plotly_chart(
+            fig_dual,
+            use_container_width=True,
+            config=PLOTLY_CONFIG,
+            on_select="rerun",
+            selection_mode="points"
+        )
+        # Si el usuario hizo clic en una barra del gráfico
+        if es_vista_mensual and not mes_en_drilldown and chart_event:
+            puntos = chart_event.get("selection", {}).get("points", [])
+            if puntos and len(puntos) > 0:
+                mes_click = puntos[0].get("x")
+                if mes_click and mes_click in df['MES_AÑO'].unique():
+                    st.session_state.drilldown_mes = mes_click
+                    st.rerun()
+    except Exception:
+        # Fallback para versiones antiguas de Streamlit
+        st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
+
+    # SELECTOR DE DRILL-DOWN PARA MÓVILES (Facilidad táctil cuando tocar la barra es difícil)
+    if es_vista_mensual and not mes_en_drilldown:
+        col_d1, col_d2 = st.columns([1.5, 2])
+        with col_d1:
+            meses_disp = ["(Selecciona un mes para ver sus semanas)"] + sorted(df['MES_AÑO'].unique().tolist())
+            elegido = st.selectbox(
+                "🔎 O selecciona aquí el mes para desglose semanal:",
+                options=meses_disp,
+                index=0
+            )
+            if elegido != "(Selecciona un mes para ver sus semanas)":
+                st.session_state.drilldown_mes = elegido
+                st.rerun()
+
     max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
     max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
     st.markdown(f"""
     <div class="chart-insight">
-        💡 <b>Diagnóstico de Estacionalidad & Ventas:</b><br>
-        • <b>Temporada Alta (Otoño/Invierno):</b> Tus despachos alcanzaron su pico absoluto en <b>{max_vol_row[col_periodo]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs), coincidiendo con la ventana de mayor abastecimiento mayorista.<br>
-        • <b>Temporada Baja (Primavera):</b> La oferta mayorista se contrae y el precio ponderado de venta trepó a su máximo de <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b> en <b>{max_p_row[col_periodo]}</b>.
+        💡 <b>Diagnóstico del Periodo Analizado:</b><br>
+        • <b>Pico de Abastecimiento:</b> El mayor volumen se registró en <b>{max_vol_row[col_actual]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs).<br>
+        • <b>Máximo Precio Ponderado:</b> El precio promedio más alto fue de <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b> en <b>{max_p_row[col_actual]}</b>.
     </div>
     """, unsafe_allow_html=True)
 
@@ -592,14 +678,15 @@ if vista_activa == "📊 Resumen & Evolución":
     with col_mix:
         st.subheader("Mix y Concentración por Producto")
         
-        df_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
+        df_prod = df_target.groupby('DESCRIPCION_PRODUCTO').agg(
             VALOR=('VALOR_COMERCIAL', 'sum'),
             KG=('KILOS_SOLICITADOS', 'sum'),
             ORDENES=('NRO_OC', 'nunique')
         ).reset_index().sort_values(by='VALOR', ascending=False)
         
+        valor_target_total = df_target['VALOR_COMERCIAL'].sum()
         df_prod['PRECIO_POND'] = df_prod['VALOR'] / df_prod['KG']
-        df_prod['PART_VALOR'] = (df_prod['VALOR'] / valor_comercial_total) * 100
+        df_prod['PART_VALOR'] = (df_prod['VALOR'] / valor_target_total) * 100 if valor_target_total > 0 else 0
         
         hover_texts = [
             f"🥑 <b>{row['DESCRIPCION_PRODUCTO']}</b><br><br>"
@@ -637,16 +724,16 @@ if vista_activa == "📊 Resumen & Evolución":
         top_prod = df_prod.iloc[0]
         st.markdown(f"""
         <div class="chart-insight">
-            📌 <b>Concentración:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{top_prod['PART_VALOR']:.1f}%</b> de la facturación (S/ {top_prod['VALOR']:,.0f}).
+            📌 <b>Concentración:</b> <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> concentra el <b>{top_prod['PART_VALOR']:.1f}%</b> de la facturación del tramo (S/ {top_prod['VALOR']:,.0f}).
         </div>
         """, unsafe_allow_html=True)
 
     with col_matriz:
-        st.subheader(f"📋 Matriz Periódica de Variación ({periodo_seleccionado})")
+        st.subheader(f"📋 Matriz Periódica de Variación ({label_actual})")
         st.caption("Semáforo: 🟢 Aumento > +2% | 🟡 Estable [-2%, +2%] | 🔴 Descenso < -2%")
         
-        df_var_display = df_trend[[col_periodo, 'KG_TOTALES', 'VAR_KG_PCT', 'PRECIO_POND', 'VAR_PRECIO_PCT', 'VALOR_TOTAL', 'VAR_VALOR_PCT', 'ORDENES']].copy()
-        df_var_display.columns = [label_periodo, 'Kilos Solicitados', 'Var. Kg %', 'Precio Ponderado', 'Var. Precio %', 'Venta Bruta (S/)', 'Var. Venta %', 'Órdenes (OC)']
+        df_var_display = df_trend[[col_actual, 'KG_TOTALES', 'VAR_KG_PCT', 'PRECIO_POND', 'VAR_PRECIO_PCT', 'VALOR_TOTAL', 'VAR_VALOR_PCT', 'ORDENES']].copy()
+        df_var_display.columns = [label_actual, 'Kilos Solicitados', 'Var. Kg %', 'Precio Ponderado', 'Var. Precio %', 'Venta Bruta (S/)', 'Var. Venta %', 'Órdenes (OC)']
         
         st.dataframe(
             df_var_display.style.format({

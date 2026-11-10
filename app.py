@@ -17,7 +17,7 @@ st.set_page_config(
 
 # --- PALETA CORPORATIVA ---
 COLOR_PRIMARY = "#1b4332"
-COLOR_BARRA_CLARA = "#52b788"      # Verde esmeralda luminoso para barras
+COLOR_BARRA_CLARA = "#52b788"      # Verde esmeralda luminoso
 COLOR_BARRA_BORDE = "#2d6a4f"      # Contorno contrastado
 COLOR_ACCENT = "#d97706"           # Línea de precio en ámbar
 COLOR_NEUTRAL = "#0f172a"
@@ -147,7 +147,7 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* OPTIMIZACIÓN SIDEBAR (PANEL DE CONTROL COMPACTO) */
+    /* OPTIMIZACIÓN SIDEBAR */
     section[data-testid="stSidebar"] {{
         background-color: #ffffff;
         border-right: 1px solid #e2e8f0;
@@ -462,7 +462,7 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # 1. GRÁFICO A TODO EL ANCHO: ESTACIONES PEGADAS DIRECTAMENTE AL EJE X
+    # 1. GRÁFICO A TODO EL ANCHO: ESTACIONES DEBAJO DE LOS MESES SIN SUPERPOSICIÓN
     st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
     fig_dual = go.Figure()
 
@@ -475,9 +475,9 @@ if vista_activa == "📊 Resumen & Evolución":
             color=COLOR_BARRA_CLARA,
             line=dict(color=COLOR_BARRA_BORDE, width=1.5)
         ),
-        text=df_trend['TN_TOTALES'].apply(lambda x: f"{x:,.1f} Tn"),
+        text=df_trend['TN_TOTALES'].apply(lambda x: f"<b>{x:,.1f} Tn</b>"),
         textposition='outside',
-        outsidetextfont=dict(color='#0f172a', size=11.5, family="Arial", weight="bold"),
+        outsidetextfont=dict(color='#0f172a', size=11, family="Arial"),
         hovertemplate=(
             f"<b>{label_periodo}: %{{x}}</b><br>" +
             "📦 Volumen Solicitado: <b>%{y:.2f} Tn</b> (%{customdata[0]:,.0f} kg)<br>" +
@@ -494,9 +494,9 @@ if vista_activa == "📊 Resumen & Evolución":
         y=df_trend['PRECIO_POND'],
         name='Precio Pond. (S/)',
         mode='lines+markers+text',
-        text=df_trend['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
+        text=df_trend['PRECIO_POND'].apply(lambda x: f"<b>S/{x:.2f}</b>"),
         textposition='top center',
-        textfont=dict(color='#b45309', size=11.5, family="Arial", weight="bold"),
+        textfont=dict(color='#b45309', size=11, family="Arial"),
         marker=dict(size=9, color=COLOR_ACCENT),
         line=dict(width=3.2, color=COLOR_ACCENT),
         hovertemplate=(
@@ -509,7 +509,7 @@ if vista_activa == "📊 Resumen & Evolución":
     anotaciones_estaciones = []
     lineas_estaciones = []
 
-    # DELIMITADORES PEGADOS DEBAJO DE LAS ETIQUETAS DE LOS MESES
+    # DELIMITADORES DE ESTACIONES UBICADOS DEBAJO DE LAS ETIQUETAS DEL EJE X
     if periodo_seleccionado == "Mensual":
         lista_meses = df_trend[col_periodo].tolist()
         
@@ -523,31 +523,36 @@ if vista_activa == "📊 Resumen & Evolución":
                 return
             ini = meses_est[0]
             fin = meses_est[-1]
-            med = meses_est[len(meses_est)//2]
             
-            # Línea horizontal tenue inmediatamente debajo de los meses
+            # Línea guía horizontal por debajo de los nombres de los meses (y=-0.14)
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
-                x0=ini, x1=fin, y0=-0.055, y1=-0.055,
-                line=dict(color="#cbd5e1", width=1.5, dash="dot")
+                x0=ini, x1=fin, y0=-0.14, y1=-0.14,
+                line=dict(color="#94a3b8", width=1.5, dash="dot")
             ))
-            # Pequeño tope vertical al inicio
+            # Topes verticales delimitadores
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
-                x0=ini, x1=ini, y0=-0.045, y1=-0.065,
-                line=dict(color="#cbd5e1", width=1.5)
+                x0=ini, x1=ini, y0=-0.11, y1=-0.17,
+                line=dict(color="#94a3b8", width=1.5)
             ))
-            # Pequeño tope vertical al final
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
-                x0=fin, x1=fin, y0=-0.045, y1=-0.065,
-                line=dict(color="#cbd5e1", width=1.5)
+                x0=fin, x1=fin, y0=-0.11, y1=-0.17,
+                line=dict(color="#94a3b8", width=1.5)
             ))
-            # Nombre centrado pegado a la línea
+            
+            # Cálculo del punto medio de los meses
+            idx_ini = lista_meses.index(ini)
+            idx_fin = lista_meses.index(fin)
+            idx_med = int(round((idx_ini + idx_fin) / 2))
+            med_mes = lista_meses[idx_med]
+            
+            # Nombre de la estación ubicado debajo de la línea guía (y=-0.23)
             anotaciones_estaciones.append(dict(
-                x=med, y=-0.098, xref='x', yref='paper',
-                text=nombre_est, showarrow=False,
-                font=dict(size=10.5, color=color_txt, weight="bold")
+                x=med_mes, y=-0.23, xref='x', yref='paper',
+                text=f"<b>{nombre_est}</b>", showarrow=False,
+                font=dict(size=11, color=color_txt, family='Arial')
             ))
 
         agregar_delimitador_estacion(m_verano, "☀️ Verano", "#854d0e")
@@ -564,8 +569,8 @@ if vista_activa == "📊 Resumen & Evolución":
         template='plotly_white',
         shapes=lineas_estaciones,
         annotations=anotaciones_estaciones,
-        height=450,
-        margin=dict(t=40, b=42, l=10, r=10)
+        height=470,
+        margin=dict(t=40, b=80, l=10, r=10)  # Margen b=80 da el espacio vertical exacto para que nada se choque
     )
     st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
     
@@ -581,7 +586,7 @@ if vista_activa == "📊 Resumen & Evolución":
 
     st.markdown("---")
 
-    # 2. MIX DE PRODUCTO Y MATRIZ PERIÓDICA EN LA MISMA LÍNEA (2 COLUMNAS)
+    # 2. MIX DE PRODUCTO Y MATRIZ PERIÓDICA EN LA MISMA LÍNEA
     col_mix, col_matriz = st.columns([1, 1.35])
     
     with col_mix:
@@ -614,7 +619,7 @@ if vista_activa == "📊 Resumen & Evolución":
             marker=dict(colors=pie_colors),
             textposition='inside',
             textinfo='percent+label',
-            insidetextfont=dict(color='#ffffff', size=11, family="Arial", weight="bold"),
+            insidetextfont=dict(color='#ffffff', size=11, family="Arial"),
             hoverinfo='text',
             hovertext=hover_texts
         )])
@@ -705,7 +710,7 @@ else:
             if pd.isna(val):
                 text_mkt_intercalado.append("")
             elif mes_num % 2 != 0 or mes_num == 11:
-                text_mkt_intercalado.append(f"S/{val:.2f}")
+                text_mkt_intercalado.append(f"<b>S/{val:.2f}</b>")
             else:
                 text_mkt_intercalado.append("")
 
@@ -715,7 +720,7 @@ else:
             if pd.isna(val):
                 text_kco_intercalado.append("")
             elif mes_num % 2 == 0 or mes_num == 11:
-                text_kco_intercalado.append(f"S/{val:.2f}")
+                text_kco_intercalado.append(f"<b>S/{val:.2f}</b>")
             else:
                 text_kco_intercalado.append("")
 
@@ -740,7 +745,7 @@ else:
             mode='lines+markers+text',
             text=text_mkt_intercalado,
             textposition='bottom center',
-            textfont=dict(color='#475569', size=11, family='Arial', weight='bold'),
+            textfont=dict(color='#475569', size=11, family='Arial'),
             line=dict(color='#475569', width=2.8),
             marker=dict(size=7, color='#475569'),
             hovertemplate="<b>%{x} (Mayorista 2026)</b><br>Costo Mercado: S/ %{y:.2f} /kg<extra></extra>"
@@ -752,9 +757,9 @@ else:
             y=[mkt_nov_val, mkt_dic_pred],
             name='Mayorista 2026 (Previsión Dic)',
             mode='lines+markers+text',
-            text=["", f"S/{mkt_dic_pred:.2f}*"],
+            text=["", f"<b>S/{mkt_dic_pred:.2f}*</b>"],
             textposition='bottom center',
-            textfont=dict(color='#64748b', size=11, family='Arial', weight='bold'),
+            textfont=dict(color='#64748b', size=11, family='Arial'),
             line=dict(color='#64748b', width=2.5, dash='dash'),
             marker=dict(size=8, symbol='diamond', color='#64748b'),
             hovertemplate="<b>%{x} (Previsión Mercado)</b><br>Costo Estimado: S/ %{y:.2f} /kg<extra></extra>"
@@ -768,7 +773,7 @@ else:
             mode='lines+markers+text',
             text=text_kco_intercalado,
             textposition='top center',
-            textfont=dict(color='#1b4332', size=11, family='Arial', weight='bold'),
+            textfont=dict(color='#1b4332', size=11, family='Arial'),
             line=dict(color='#1b4332', width=3.5),
             marker=dict(size=9, color='#1b4332'),
             hovertemplate="<b>%{x} (KCO Venta)</b><br>Precio Ponderado: S/ %{y:.2f} /kg<extra></extra>"
@@ -780,9 +785,9 @@ else:
             y=[kco_nov_val, kco_dic_pred],
             name='KCO Venta (Previsión Dic)',
             mode='lines+markers+text',
-            text=["", f"S/{kco_dic_pred:.2f}*"],
+            text=["", f"<b>S/{kco_dic_pred:.2f}*</b>"],
             textposition='top center',
-            textfont=dict(color='#d97706', size=12, family='Arial', weight='bold'),
+            textfont=dict(color='#d97706', size=12, family='Arial'),
             line=dict(color='#d97706', width=3.2, dash='dash'),
             marker=dict(size=10, symbol='star', color='#d97706'),
             hovertemplate="<b>%{x} (Previsión KCO)</b><br>Cotización Sugerida: S/ %{y:.2f} /kg<extra></extra>"
@@ -796,7 +801,7 @@ else:
                 title='',
                 categoryorder='array',
                 categoryarray=meses_nombres,
-                tickfont=dict(size=12, weight='bold', color='#1e293b')
+                tickfont=dict(size=12, color='#1e293b')
             ),
             yaxis=dict(
                 title='Precio (S/ por Kg)',
@@ -880,13 +885,13 @@ else:
                 x=col_periodo,
                 y='VAR_PRECIO_PCT',
                 color='VAR_PRECIO_PCT',
-                text=df_changes.tail(20)['VAR_PRECIO_PCT'].apply(lambda x: f"{x:+.1f}%"),
+                text=df_changes.tail(20)['VAR_PRECIO_PCT'].apply(lambda x: f"<b>{x:+.1f}%</b>"),
                 color_continuous_scale='RdYlGn',
                 custom_data=['DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'KG']
             )
             fig_var.update_traces(
                 textposition='outside',
-                outsidetextfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
+                outsidetextfont=dict(color='#0f172a', size=11, family="Arial"),
                 hovertemplate=(
                     f"<b>{label_periodo}: %{{x}}</b><br>" +
                     "🥑 <b>Producto: %{customdata[0]}</b><br>" +
@@ -996,9 +1001,9 @@ else:
         x=df_banda['DESCRIPCION_PRODUCTO'],
         y=df_banda['PRECIO_POND'],
         mode='markers+text',
-        text=df_banda['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
+        text=df_banda['PRECIO_POND'].apply(lambda x: f"<b>S/{x:.2f}</b>"),
         textposition='top center',
-        textfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
+        textfont=dict(color='#0f172a', size=11, family="Arial"),
         marker=dict(size=12, color=COLOR_ACCENT, symbol='diamond'),
         hovertemplate="<b>%{x}</b><br>🏷️ Precio Ponderado: <b>S/ %{y:.2f} /kg</b><extra></extra>"
     ))

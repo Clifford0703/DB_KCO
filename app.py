@@ -15,26 +15,27 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- PALETA CORPORATIVA ---
-COLOR_PRIMARY = "#1b4332"
-COLOR_BARRA_CLARA = "#52b788"
-COLOR_BARRA_BORDE = "#2d6a4f"
-COLOR_ACCENT = "#d97706"
+# --- PALETA CORPORATIVA PREMIUM ---
+COLOR_PRIMARY = "#0f3a28"
+COLOR_BARRA_CLARA = "#34d399"       # Verde esmeralda vivo
+COLOR_BARRA_BORDE = "#059669"
+COLOR_ACCENT = "#f59e0b"            # Ámbar dorado cálido
 COLOR_NEUTRAL = "#0f172a"
-COLOR_INFO = "#0284c7"
+COLOR_INFO = "#2563eb"
 COLOR_MERCADO = "#64748b"
 
 VARIEDAD_COLORS = {
-    'PALTA-FUERTE-A-KG': '#1b4332',
-    'PALTA-FUERTE-V-KG': '#0284c7',
-    'PALTA-FUERTE-P-KG': '#d97706',
+    'PALTA-FUERTE-A-KG': '#0f3a28',
+    'PALTA-FUERTE-V-KG': '#2563eb',
+    'PALTA-FUERTE-P-KG': '#f59e0b',
     'PALTA-FUERTE-C-KG': '#7c3aed',
-    'PALTA-M-KG':        '#16a34a'
+    'PALTA-M-KG':        '#10b981'
 }
 
-# --- ESTILOS CSS TIPO POWER BI ---
+# --- ESTILOS CSS UI/UX PREMIUM ---
 st.markdown(f"""
     <style>
+    /* Ocultar barra superior nativa vacía */
     header[data-testid="stHeader"] {{
         background: transparent !important;
         height: 0px !important;
@@ -46,90 +47,175 @@ st.markdown(f"""
     .block-container {{
         max-width: 100% !important;
         padding-top: 0.2rem !important;
-        padding-bottom: 0.5rem !important;
-        padding-left: 0.7rem !important;
-        padding-right: 0.7rem !important;
+        padding-bottom: 0.6rem !important;
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+    }}
+
+    /* BARRA SUPERIOR CON MARGEN DE SEGURIDAD CONTRA ICONOS DEL SISTEMA */
+    .header-bar {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 6px;
+        margin-left: 36px;   /* Deja libre la flecha del sidebar */
+        margin-right: 170px; /* Deja libre los botones Share, Star, GitHub de Streamlit */
+        margin-bottom: 6px;
+    }}
+    .header-title {{
+        font-size: 16.5px;
+        font-weight: 800;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        letter-spacing: -0.3px;
+    }}
+    .header-meta {{
+        color: #64748b;
+        font-size: 10.5px;
+        text-align: right;
+        white-space: nowrap;
+        line-height: 1.2;
     }}
     
     .chart-header {{
         font-size: 11.5px;
         font-weight: 700;
-        color: #0f172a;
-        margin-top: 2px;
+        color: #1e293b;
+        margin-top: 3px;
         margin-bottom: 2px;
         display: flex;
         align-items: center;
         gap: 5px;
     }}
 
+    /* TARJETAS KPI DE ALTO IMPACTO VISUAL */
     .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(5, 1fr);
-        gap: 5px;
-        margin-bottom: 6px;
+        gap: 8px;
+        margin-bottom: 8px;
         width: 100%;
     }}
-    .metric-card {{
+    .kpi-card {{
         background: #ffffff;
-        padding: 4px 8px;
-        border-radius: 5px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-        border-left: 3px solid {COLOR_PRIMARY};
+        border-radius: 9px;
+        padding: 8px 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e2e8f0;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        box-sizing: border-box;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
     }}
-    .metric-title {{
-        font-size: 9px;
-        color: #64748b;
+    .kpi-card:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.08);
+    }}
+    .kpi-top {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2px;
+    }}
+    .kpi-title {{
+        font-size: 9.5px;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.3px;
-        line-height: 1.1;
+        letter-spacing: 0.5px;
+        color: #475569;
     }}
-    .metric-value {{
-        font-size: 15px;
-        color: {COLOR_NEUTRAL};
+    .kpi-badge {{
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-weight: 600;
+    }}
+    .kpi-value {{
+        font-size: 20px;
         font-weight: 800;
-        margin-top: 1px;
-        line-height: 1.1;
+        color: #0f172a;
+        letter-spacing: -0.6px;
+        line-height: 1.15;
     }}
-    .metric-sub {{
-        font-size: 8.5px;
-        color: #94a3b8;
-        font-weight: 500;
-        line-height: 1.1;
+    .kpi-sub {{
+        font-size: 9px;
+        font-weight: 600;
+        margin-top: 2px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }}
+
+    /* VARIANTES DE TARJETAS */
+    .kpi-volumen {{
+        background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+        border-top: 3.5px solid #10b981;
+    }}
+    .kpi-volumen .kpi-badge {{ background: #dcfce7; color: #15803d; }}
+    .kpi-volumen .kpi-sub {{ color: #16a34a; }}
+
+    .kpi-venta {{
+        background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+        border-top: 3.5px solid #3b82f6;
+    }}
+    .kpi-venta .kpi-badge {{ background: #dbeafe; color: #1d4ed8; }}
+    .kpi-venta .kpi-sub {{ color: #2563eb; }}
+
+    .kpi-precio {{
+        background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+        border-top: 3.5px solid #f59e0b;
+    }}
+    .kpi-precio .kpi-badge {{ background: #fef3c7; color: #b45309; }}
+    .kpi-precio .kpi-sub {{ color: #d97706; }}
+
+    .kpi-ordenes {{
+        background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
+        border-top: 3.5px solid #8b5cf6;
+    }}
+    .kpi-ordenes .kpi-badge {{ background: #f3e8ff; color: #6d28d9; }}
+    .kpi-ordenes .kpi-sub {{ color: #7c3aed; }}
+
+    .kpi-jabas {{
+        background: linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%);
+        border-top: 3.5px solid #059669;
+    }}
+    .kpi-jabas .kpi-badge {{ background: #d1fae5; color: #047857; }}
+    .kpi-jabas .kpi-sub {{ color: #059669; }}
 
     .drilldown-bar {{
         background: #e0f2fe;
         border-left: 3.5px solid #0284c7;
-        padding: 3px 8px;
-        border-radius: 5px;
+        padding: 4px 10px;
+        border-radius: 6px;
         font-size: 11px;
         font-weight: 700;
         color: #0369a1;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 3px;
+        margin-bottom: 4px;
     }}
 
+    /* SELECTOR DE VISTAS ESTILO TABS PBI */
     div[data-testid="stRadio"] > div {{
         background: #e2e8f0;
-        padding: 2px;
-        border-radius: 6px;
-        gap: 2px;
+        padding: 3px;
+        border-radius: 7px;
+        gap: 3px;
     }}
     div[data-testid="stRadio"] > div > label {{
         flex: 1 1 0;
         background: transparent;
-        padding: 4px 8px !important;
+        padding: 5px 12px !important;
         border-radius: 5px;
         text-align: center;
         font-weight: 700;
-        font-size: 11px !important;
+        font-size: 11.5px !important;
         justify-content: center;
         cursor: pointer;
         margin: 0 !important;
@@ -137,7 +223,7 @@ st.markdown(f"""
     div[data-testid="stRadio"] > div > label[data-checked="true"] {{
         background: {COLOR_PRIMARY} !important;
         color: #ffffff !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
     }}
     div[data-testid="stRadio"] > div > label[data-checked="true"] p {{
         color: #ffffff !important;
@@ -232,17 +318,29 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR (FILTROS) ---
+# --- SIDEBAR (FILTROS CON OPCIÓN 'TODOS' LIMPIA) ---
 with st.sidebar:
-    st.markdown("### 🥑 Panel de Control")
+    st.markdown("### 🥑 Panel de Segmentación")
     min_date, max_date = df_raw['FECHA_EMISION'].min(), df_raw['FECHA_EMISION'].max()
-    date_range = st.date_input("Periodo", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+    date_range = st.date_input("Periodo de Emisión", value=(min_date, max_date), min_value=min_date, max_value=max_date)
     
-    prods = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
-    selected_prods = st.multiselect("Variedad", options=prods, default=prods)
+    prods_reales = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
+    opciones_filtro = ["(Todas las variedades)"] + prods_reales
+    
+    filtro_seleccionado = st.multiselect(
+        "🏷️ Variedad / Calibre",
+        options=opciones_filtro,
+        default=["(Todas las variedades)"]
+    )
+    
+    # Lógica limpia: Si está "(Todas las variedades)" o vacío, toma todas
+    if "(Todas las variedades)" in filtro_seleccionado or len(filtro_seleccionado) == 0:
+        selected_prods = prods_reales
+    else:
+        selected_prods = [p for p in filtro_seleccionado if p != "(Todas las variedades)"]
     
     periodo_seleccionado = st.radio(
-        "Frecuencia Base",
+        "⏱️ Agrupación Base",
         options=["Mensual", "Semanal"],
         horizontal=True
     )
@@ -259,20 +357,26 @@ if selected_prods:
     df = df[df['DESCRIPCION_PRODUCTO'].isin(selected_prods)]
 
 if df.empty:
-    st.warning("⚠️ No se encontraron órdenes.")
+    st.warning("⚠️ No se encontraron órdenes para la combinación seleccionada.")
     st.stop()
 
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
-# --- HEADER SUPERIOR: TÍTULO A LA IZQUIERDA Y METADATA A LA DERECHA ---
-col_head_title, col_head_meta = st.columns([2.2, 1.8])
-with col_head_title:
-    st.markdown('<div style="font-size: 16px; font-weight: 800; color: #0f172a; padding-top: 2px; white-space: nowrap;">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
-with col_head_meta:
-    st.markdown(f'<div style="color: #64748b; font-size: 10.5px; text-align: right; padding-top: 4px; white-space: nowrap; line-height: 1.15;"><b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i> &nbsp;•&nbsp; <span style="color: #94a3b8;">🕒 {update_time}</span></div>', unsafe_allow_html=True)
+# --- HEADER DESPEJADO (SIN INTERFERENCIA DE ICONOS DEL NAVEGADOR) ---
+st.markdown(f"""
+    <div class="header-bar">
+        <div class="header-title">
+            🥑 KCO Group | Intelligence & Pricing Dashboard
+        </div>
+        <div class="header-meta">
+            <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i><br>
+            <span style="color: #94a3b8;">🕒 Act: {update_time}</span>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
-# --- KPIS TIPO CARDS POWER BI ---
+# --- KPIS DE ALTO IMPACTO (5 CARDS DESTACADAS) ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -282,36 +386,51 @@ total_jabas_est = df['JABAS_EST'].sum()
 
 st.markdown(f"""
     <div class="kpi-grid">
-        <div class="metric-card" style="border-left-color: {COLOR_PRIMARY};">
-            <div class="metric-title">Volumen Total</div>
-            <div class="metric-value">{total_kg:,.0f} kg</div>
-            <div class="metric-sub">{total_kg/1000:,.1f} Tn</div>
+        <div class="kpi-card kpi-volumen">
+            <div class="kpi-top">
+                <span class="kpi-title">Volumen Solicitado</span>
+                <span class="kpi-badge">📦 Kg</span>
+            </div>
+            <div class="kpi-value">{total_kg:,.0f} kg</div>
+            <div class="kpi-sub">Total: <b>{total_kg/1000:,.1f} Tn</b></div>
         </div>
-        <div class="metric-card" style="border-left-color: {COLOR_INFO};">
-            <div class="metric-title">Facturación Venta</div>
-            <div class="metric-value">S/ {valor_comercial_total:,.0f}</div>
-            <div class="metric-sub">Bruto pactado</div>
+        <div class="kpi-card kpi-venta">
+            <div class="kpi-top">
+                <span class="kpi-title">Facturación Bruta</span>
+                <span class="kpi-badge">💰 PEN</span>
+            </div>
+            <div class="kpi-value">S/ {valor_comercial_total:,.0f}</div>
+            <div class="kpi-sub">Venta total pactada</div>
         </div>
-        <div class="metric-card" style="border-left-color: {COLOR_ACCENT};">
-            <div class="metric-title">Precio Pond. General</div>
-            <div class="metric-value">S/ {precio_ponderado_total:.2f}</div>
-            <div class="metric-sub">Soles / kg</div>
+        <div class="kpi-card kpi-precio">
+            <div class="kpi-top">
+                <span class="kpi-title">Precio Ponderado</span>
+                <span class="kpi-badge">🏷️ Margen</span>
+            </div>
+            <div class="kpi-value">S/ {precio_ponderado_total:.2f}</div>
+            <div class="kpi-sub">Por kg promedio</div>
         </div>
-        <div class="metric-card" style="border-left-color: #8b5cf6;">
-            <div class="metric-title">Órdenes Únicas</div>
-            <div class="metric-value">{total_ocs:,}</div>
-            <div class="metric-sub">{kg_promedio_oc:,.0f} kg/OC</div>
+        <div class="kpi-card kpi-ordenes">
+            <div class="kpi-top">
+                <span class="kpi-title">Órdenes Despachadas</span>
+                <span class="kpi-badge">📋 OCs</span>
+            </div>
+            <div class="kpi-value">{total_ocs:,}</div>
+            <div class="kpi-sub">Promedio: <b>{kg_promedio_oc:,.0f} kg/OC</b></div>
         </div>
-        <div class="metric-card" style="border-left-color: #059669;">
-            <div class="metric-title">Jabas Estimadas</div>
-            <div class="metric-value">{total_jabas_est:,.0f}</div>
-            <div class="metric-sub">Factor 18 kg/jaba</div>
+        <div class="kpi-card kpi-jabas">
+            <div class="kpi-top">
+                <span class="kpi-title">Jabas Estimadas</span>
+                <span class="kpi-badge">🚛 Logística</span>
+            </div>
+            <div class="kpi-value">{total_jabas_est:,.0f}</div>
+            <div class="kpi-sub">Ratio: 18 kg / jaba</div>
         </div>
     </div>
 """, unsafe_allow_html=True)
 
-# --- SELECTOR DE PÁGINAS Y BOTÓN DE PANTALLA COMPLETA TOTALMENTE CLICABLE AL COSTADO ---
-col_tabs, col_fs_btn = st.columns([8.2, 0.45])
+# --- SELECTOR DE HOJAS CON BOTÓN DE PANTALLA COMPLETA TOTALMENTE LIBRE Y ACCESIBLE ---
+col_tabs, col_fs_btn = st.columns([9.2, 0.45])
 
 with col_tabs:
     vista_activa = st.radio(
@@ -323,21 +442,21 @@ with col_tabs:
 
 with col_fs_btn:
     components.html("""
-        <div style="display: flex; justify-content: flex-end; align-items: center; height: 26px;">
+        <div style="display: flex; justify-content: flex-end; align-items: center; height: 28px;">
             <button id="fs-btn" onclick="toggleFullScreen()" title="Pantalla Completa" style="
-                background-color: #1b4332; 
+                background-color: #0f3a28; 
                 color: #ffffff; 
                 border: none; 
-                border-radius: 5px;
-                width: 28px; 
-                height: 25px; 
-                font-size: 13px; 
+                border-radius: 6px;
+                width: 32px; 
+                height: 27px; 
+                font-size: 14px; 
                 cursor: pointer;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.12); 
+                box-shadow: 0 1px 3px rgba(0,0,0,0.15); 
                 display: flex; 
                 align-items: center; 
                 justify-content: center;
-                transition: background-color 0.2s;
+                transition: all 0.2s ease;
             ">
                 <span id="fs-icon">⛶</span>
             </button>
@@ -357,7 +476,7 @@ with col_fs_btn:
                 }
             }
         </script>
-    """, height=28)
+    """, height=30)
 
 # ==========================================================
 # HOJA 1: RESUMEN EJECUTIVO & EVOLUCIÓN
@@ -370,9 +489,9 @@ if vista_activa == "📊 Resumen & Evolución":
     if es_vista_mensual and mes_en_drilldown:
         b_c1, b_c2 = st.columns([3.5, 0.8])
         with b_c1:
-            st.markdown(f'<div class="drilldown-bar"><span>🔍 Vista Semanal activa del mes: <b>{mes_en_drilldown}</b></span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="drilldown-bar"><span>🔍 Desglose semanal activo del mes: <b>{mes_en_drilldown}</b></span></div>', unsafe_allow_html=True)
         with b_c2:
-            if st.button("⬅️ Ver meses", use_container_width=True, type="primary"):
+            if st.button("⬅️ Ver todos los meses", use_container_width=True, type="primary"):
                 st.session_state.drilldown_mes = None
                 st.rerun()
 
@@ -398,7 +517,7 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # Si es vista semanal general, por default solo se analizan las últimas 20 semanas (sin barra desplazadora)
+    # Si es vista semanal general, mostrar por default las últimas 20 semanas de forma limpia
     if periodo_seleccionado == "Semanal" and not mes_en_drilldown:
         if len(df_trend) > 20:
             df_trend = df_trend.tail(20).reset_index(drop=True)
@@ -415,7 +534,7 @@ if vista_activa == "📊 Resumen & Evolución":
         text=df_trend['TN_TOTALES'].apply(lambda x: f"<b>{x:,.1f} Tn</b>"),
         textposition='outside',
         cliponaxis=False,
-        outsidetextfont=dict(color='#064e3b', size=9, family="Arial"),
+        outsidetextfont=dict(color='#065f46', size=9.5, family="Arial"),
         hovertemplate=f"<b>{label_actual}: %{{x}}</b><br>Volumen: %{{y:.2f}} Tn (%{{customdata[0]:,.0f}} kg)<br>Venta: S/ %{{customdata[2]:,.2f}}<extra></extra>",
         customdata=np.stack((df_trend['KG_TOTALES'], df_trend['ORDENES'], df_trend['VALOR_TOTAL']), axis=-1),
         yaxis='y'
@@ -426,8 +545,8 @@ if vista_activa == "📊 Resumen & Evolución":
         y=df_trend['PRECIO_POND'],
         name='Precio (S/)',
         mode='lines+markers',
-        marker=dict(size=6, color=COLOR_ACCENT, line=dict(color="#ffffff", width=1)),
-        line=dict(width=2.5, color=COLOR_ACCENT),
+        marker=dict(size=7, color=COLOR_ACCENT, line=dict(color="#ffffff", width=1.2)),
+        line=dict(width=2.6, color=COLOR_ACCENT),
         hovertemplate=f"<b>{label_actual}: %{{x}}</b><br>Precio Pond: <b>S/ %{{y:.2f}} /kg</b><extra></extra>",
         yaxis='y2'
     ))
@@ -442,11 +561,11 @@ if vista_activa == "📊 Resumen & Evolución":
             x=x_val, y=p_val, xref='x', yref='y2',
             text=f"<b>S/{p_val:.2f}</b>",
             showarrow=True, arrowhead=0, arrowcolor='rgba(0,0,0,0)',
-            yshift=10, bgcolor="#fffbeb", bordercolor="#d97706", borderwidth=1, borderpad=2,
+            yshift=11, bgcolor="#fffbeb", bordercolor="#d97706", borderwidth=1, borderpad=2.5,
             font=dict(color="#9a3412", size=8.5, family="Arial")
         ))
 
-    # DELIMITADORES DE ESTACIONES CON ESPACIADO HOLGADO PARA EVITAR COLISIONES CON LOS MESES
+    # ESTACIONES DEL AÑO CON AMPLIO ESPACIADO PARA NO TOCAR LOS MESES
     if es_vista_mensual and not mes_en_drilldown:
         lista_meses = df_trend[col_actual].tolist()
         m_verano = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [1, 2, 3])]
@@ -460,28 +579,27 @@ if vista_activa == "📊 Resumen & Evolución":
             ini = meses_est[0]
             fin = meses_est[-1]
             
-            # Línea guía colocada en y=-0.22 (completamente por debajo de las etiquetas de los meses)
+            # Línea guía en y=-0.28 (despeja totalmente la fila de texto de los meses)
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
-                x0=ini, x1=fin, y0=-0.22, y1=-0.22,
+                x0=ini, x1=fin, y0=-0.28, y1=-0.28,
                 line=dict(color="#94a3b8", width=1.2, dash="dot")
             ))
-            # Topes verticales delimitadores
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
-                x0=ini, x1=ini, y0=-0.18, y1=-0.26,
+                x0=ini, x1=ini, y0=-0.24, y1=-0.32,
                 line=dict(color="#94a3b8", width=1.2)
             ))
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
-                x0=fin, x1=fin, y0=-0.18, y1=-0.26,
+                x0=fin, x1=fin, y0=-0.24, y1=-0.32,
                 line=dict(color="#94a3b8", width=1.2)
             ))
             
-            # Nombre de la estación colocado en y=-0.36 con suficiente respiro visual
+            # Texto de la estación en y=-0.44 con margen generoso
             idx_med = int(round((lista_meses.index(ini) + lista_meses.index(fin)) / 2))
             anotaciones_totales.append(dict(
-                x=lista_meses[idx_med], y=-0.36, xref='x', yref='paper',
+                x=lista_meses[idx_med], y=-0.44, xref='x', yref='paper',
                 text=f"<b>{nombre_est}</b>", showarrow=False,
                 font=dict(size=9.5, color=color_txt, family='Arial')
             ))
@@ -496,9 +614,9 @@ if vista_activa == "📊 Resumen & Evolución":
         clickmode='event+select',
         xaxis=dict(
             title='',
-            tickangle=-35 if (periodo_seleccionado == "Semanal" or mes_en_drilldown) else 0,
-            tickfont=dict(size=9),
-            rangeslider=dict(visible=False)  # Sin barra desplazadora
+            tickangle=-32 if (periodo_seleccionado == "Semanal" or mes_en_drilldown) else 0,
+            tickfont=dict(size=9, color="#1e293b"),
+            rangeslider=dict(visible=False)
         ),
         yaxis=dict(title='Volumen (Tn)', showgrid=False, titlefont=dict(size=9.5), tickfont=dict(size=8.5)),
         yaxis2=dict(title='Precio S/ /kg', overlaying='y', side='right', showgrid=True, titlefont=dict(size=9.5), tickfont=dict(size=8.5)),
@@ -507,7 +625,7 @@ if vista_activa == "📊 Resumen & Evolución":
         shapes=lineas_estaciones,
         annotations=anotaciones_totales,
         height=245,
-        margin=dict(t=20, b=65 if (es_vista_mensual and not mes_en_drilldown) else 25, l=8, r=8)  # Margen b=65 para holgura de estaciones
+        margin=dict(t=18, b=75 if (es_vista_mensual and not mes_en_drilldown) else 25, l=8, r=8)
     )
 
     chart_key = "grafico_mensual_click" if not mes_en_drilldown else "grafico_semanal_view"
@@ -543,7 +661,7 @@ if vista_activa == "📊 Resumen & Evolución":
         df_prod['PRECIO_POND'] = df_prod['VALOR'] / df_prod['KG']
         df_prod['PART_VALOR'] = (df_prod['VALOR'] / valor_target_total) * 100 if valor_target_total > 0 else 0
         
-        pie_colors = [VARIEDAD_COLORS.get(prod, '#2d6a4f') for prod in df_prod['DESCRIPCION_PRODUCTO']]
+        pie_colors = [VARIEDAD_COLORS.get(prod, '#0f3a28') for prod in df_prod['DESCRIPCION_PRODUCTO']]
         
         fig_pie = go.Figure(data=[go.Pie(
             labels=df_prod['DESCRIPCION_PRODUCTO'],
@@ -649,8 +767,8 @@ else:
         fig_anual.add_trace(go.Scatter(
             x=meses_nombres[:11], y=kco_2026_real[:11], name='KCO Venta 2026',
             mode='lines+markers+text', text=text_kco_intercalado, textposition='top center',
-            textfont=dict(color='#1b4332', size=9.5, family='Arial'),
-            line=dict(color='#1b4332', width=2.8), marker=dict(size=7, color='#1b4332'),
+            textfont=dict(color='#0f3a28', size=9.5, family='Arial'),
+            line=dict(color='#0f3a28', width=2.8), marker=dict(size=7, color='#0f3a28'),
             hovertemplate="<b>%{x} KCO</b>: S/ %{y:.2f}<extra></extra>"
         ))
         fig_anual.add_trace(go.Scatter(
@@ -669,16 +787,16 @@ else:
         )
         st.plotly_chart(fig_anual, use_container_width=True, config=PLOTLY_CONFIG)
 
-        # 2. FILA DE PREVISIONES
+        # 2. PREVISIONES EJECUTIVAS
         c_p1, c_p2, c_p3 = st.columns(3)
         with c_p1:
-            st.markdown(f'<div class="metric-card" style="border-left-color: #64748b;"><div class="metric-title">Mayorista (Nov Real ➔ Dic Proy)</div><div class="metric-value">S/ {mkt_nov_val:.2f} ➔ S/ {mkt_dic_pred:.2f}</div><div class="metric-sub">Ajuste fin de año (-20.1%)</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card kpi-ordenes"><div class="kpi-title">Mayorista (Nov Real ➔ Dic Proy)</div><div class="kpi-value" style="font-size:16px;">S/ {mkt_nov_val:.2f} ➔ S/ {mkt_dic_pred:.2f}</div><div class="kpi-sub">Ajuste estacional (-20.1%)</div></div>', unsafe_allow_html=True)
         with c_p2:
-            st.markdown(f'<div class="metric-card" style="border-left-color: #1b4332;"><div class="metric-title">KCO Venta Cliente (Nov Real)</div><div class="metric-value">S/ {kco_nov_val:.2f} /kg</div><div class="metric-sub">Ponderado consolidado</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card kpi-volumen"><div class="kpi-title">KCO Venta Cliente (Nov Real)</div><div class="kpi-value" style="font-size:16px;">S/ {kco_nov_val:.2f} /kg</div><div class="kpi-sub">Ponderado consolidado</div></div>', unsafe_allow_html=True)
         with c_p3:
-            st.markdown(f'<div class="metric-card" style="border-left-color: #d97706;"><div class="metric-title">KCO Cotización Sugerida (Dic Proy)</div><div class="metric-value">S/ {kco_dic_pred:.2f} /kg</div><div class="metric-sub">Rango: S/ {kco_dic_pred - 0.30:.2f} - S/ {kco_dic_pred + 0.30:.2f}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card kpi-precio"><div class="kpi-title">KCO Sugerido (Dic Proy)</div><div class="kpi-value" style="font-size:16px;">S/ {kco_dic_pred:.2f} /kg</div><div class="kpi-sub">Rango: S/ {kco_dic_pred - 0.30:.2f} - S/ {kco_dic_pred + 0.30:.2f}</div></div>', unsafe_allow_html=True)
 
-        # 3. FILA MEDIA: BANDA DE NEGOCIACIÓN + AUDITORÍA DE VARIACIONES
+        # 3. BANDA DE PRECIOS Y VARIACIONES
         col_b1, col_b2 = st.columns([1.1, 1.4])
         with col_b1:
             st.markdown('<div class="chart-header">🎯 Banda de Negociación por Variedad</div>', unsafe_allow_html=True)
@@ -688,7 +806,7 @@ else:
             fig_banda = go.Figure()
             fig_banda.add_trace(go.Bar(
                 name='Rango Min-Max', x=df_banda['DESCRIPCION_PRODUCTO'], y=df_banda['PRECIO_MAX'] - df_banda['PRECIO_MIN'], base=df_banda['PRECIO_MIN'],
-                marker_color='rgba(45, 106, 79, 0.25)', hovertemplate="<b>%{x}</b><br>Piso: S/ %{base:.2f}<br>Techo: S/ %{customdata:.2f}<extra></extra>", customdata=df_banda['PRECIO_MAX']
+                marker_color='rgba(15, 58, 40, 0.22)', hovertemplate="<b>%{x}</b><br>Piso: S/ %{base:.2f}<br>Techo: S/ %{customdata:.2f}<extra></extra>", customdata=df_banda['PRECIO_MAX']
             ))
             fig_banda.add_trace(go.Scatter(
                 name='Precio Pond', x=df_banda['DESCRIPCION_PRODUCTO'], y=df_banda['PRECIO_POND'], mode='markers+text',
@@ -698,7 +816,7 @@ else:
             fig_banda.update_layout(autosize=True, template='plotly_white', height=205, showlegend=False, yaxis=dict(title='Precio S/ /kg', titlefont=dict(size=8.5), tickfont=dict(size=8)), xaxis=dict(tickfont=dict(size=8)), margin=dict(t=10, b=15, l=8, r=8))
             st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
 
-        # Cálculo de cambios de precio
+        # Cálculo de variaciones
         df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(KG=('KILOS_SOLICITADOS', 'sum'), VALOR=('VALOR_COMERCIAL', 'sum')).reset_index()
         df_prod_trend['PRECIO_POND'] = df_prod_trend['VALOR'] / df_prod_trend['KG']
         df_prod_trend = df_prod_trend.sort_values(by=['DESCRIPCION_PRODUCTO', col_periodo])
@@ -721,7 +839,7 @@ else:
             else:
                 st.info("Sin variaciones en el periodo.")
 
-        # 4. MATRIZ DE HISTORIAL DE CAMBIOS DE PRECIO EN PESTAÑA DESPLEGABLE
+        # 4. MATRIZ DE HISTORIAL DE CAMBIOS DE PRECIO EN EXPANDER DESPLEGABLE
         with st.expander("📋 Ver Matriz Histórica de Cambios de Precio"):
             if not df_changes.empty:
                 tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()

@@ -32,10 +32,9 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#16a34a'
 }
 
-# --- ESTILOS CSS TIPO POWER BI (FIT-TO-SCREEN COMPACTO) ---
+# --- ESTILOS CSS TIPO POWER BI ---
 st.markdown(f"""
     <style>
-    /* Ocultar barra superior nativa vacía para ganar altura de pantalla */
     header[data-testid="stHeader"] {{
         height: 2.2rem !important;
         background: transparent !important;
@@ -46,12 +45,11 @@ st.markdown(f"""
     .block-container {{
         max-width: 100% !important;
         padding-top: 2.2rem !important;
-        padding-bottom: 0.4rem !important;
+        padding-bottom: 0.8rem !important;
         padding-left: 0.8rem !important;
         padding-right: 0.8rem !important;
     }}
     
-    /* ENCABEZADO TIPO POWER BI EN LÍNEA ÚNICA */
     .pbi-header {{
         display: flex;
         justify-content: space-between;
@@ -72,18 +70,9 @@ st.markdown(f"""
         gap: 8px;
         white-space: nowrap;
     }}
-    .pbi-meta {{
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-size: 11px;
-        color: #64748b;
-        white-space: nowrap;
-    }}
     
-    /* TITULOS DE GRAFICOS COMPACTOS */
     .chart-header {{
-        font-size: 12.5px;
+        font-size: 12px;
         font-weight: 700;
         color: #0f172a;
         margin-top: 3px;
@@ -93,7 +82,6 @@ st.markdown(f"""
         gap: 6px;
     }}
 
-    /* GRID RESPONSIVO PARA KPIS TIPO POWER BI CARDS */
     .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -133,18 +121,6 @@ st.markdown(f"""
         font-weight: 500;
         line-height: 1.1;
     }}
-    
-    .chart-insight {{
-        background-color: #f1f5f9;
-        border-left: 3px solid {COLOR_PRIMARY};
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 10.5px;
-        color: #334155;
-        margin-top: 3px;
-        margin-bottom: 4px;
-        line-height: 1.3;
-    }}
 
     .drilldown-bar {{
         background: #e0f2fe;
@@ -160,7 +136,6 @@ st.markdown(f"""
         margin-bottom: 4px;
     }}
 
-    /* SELECTOR DE VISTAS COMPACTO */
     div[data-testid="stRadio"] > div {{
         background: #e2e8f0;
         padding: 2px;
@@ -277,9 +252,9 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR (FILTROS DE APOYO) ---
+# --- SIDEBAR (FILTROS) ---
 with st.sidebar:
-    st.markdown("### 🥑 Filtros de Segmentación")
+    st.markdown("### 🥑 Panel de Control")
     min_date, max_date = df_raw['FECHA_EMISION'].min(), df_raw['FECHA_EMISION'].max()
     date_range = st.date_input("Periodo", value=(min_date, max_date), min_value=min_date, max_value=max_date)
     
@@ -291,11 +266,12 @@ with st.sidebar:
         options=["Mensual", "Semanal"],
         horizontal=True
     )
+    st.divider()
+    st.caption("KCO Group — Intelligence & Pricing")
 
 col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
 label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
 
-# Filtrar data
 df = df_raw.copy()
 if len(date_range) == 2:
     df = df[(df['FECHA_EMISION'] >= pd.to_datetime(date_range[0])) & (df['FECHA_EMISION'] <= pd.to_datetime(date_range[1]))]
@@ -309,14 +285,13 @@ if df.empty:
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
-# --- HEADER TIPO POWER BI: TÍTULO A LA IZQUIERDA, AUTOR + PANTALLA COMPLETA A LA DERECHA ---
+# --- HEADER TIPO POWER BI ---
 head_col_left, head_col_right = st.columns([1.8, 2.2])
 
 with head_col_left:
     st.markdown('<div class="pbi-title">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
 
 with head_col_right:
-    # Componente integrado de metadata y botón de pantalla completa en la misma línea
     components.html(f"""
         <div style="display: flex; justify-content: flex-end; align-items: center; gap: 14px; height: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
             <div style="color: #64748b; font-size: 11px; text-align: right; line-height: 1.2;">
@@ -351,7 +326,7 @@ with head_col_right:
         </script>
     """, height=35)
 
-# --- KPIS COMPACTOS TIPO POWER BI (FILA DE 5) ---
+# --- KPIS TIPO CARDS POWER BI ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -389,7 +364,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- CONTROL SEGMENTADO TÁCTIL ---
+# --- SELECTOR DE PESTAÑAS TÁCTIL ---
 vista_activa = st.radio(
     "Selecciona la vista a explorar:",
     options=["📊 Resumen & Evolución", "🎯 Benchmark & Previsión"],
@@ -398,14 +373,13 @@ vista_activa = st.radio(
 )
 
 # ==========================================================
-# HOJA 1: RESUMEN EJECUTIVO & EVOLUCIÓN (ONE-PAGE PBI)
+# HOJA 1: RESUMEN EJECUTIVO & EVOLUCIÓN
 # ==========================================================
 if vista_activa == "📊 Resumen & Evolución":
     
     es_vista_mensual = (periodo_seleccionado == "Mensual")
     mes_en_drilldown = st.session_state.drilldown_mes if es_vista_mensual else None
 
-    # Miga de pan compacta cuando hay drill-down activo
     if es_vista_mensual and mes_en_drilldown:
         b_c1, b_c2 = st.columns([3.5, 0.8])
         with b_c1:
@@ -437,7 +411,7 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # 1. GRÁFICO SUPERIOR: EVOLUCIÓN (Altura optimizada: 240px)
+    # GRÁFICO SUPERIOR
     st.markdown(f'<div class="chart-header">📈 {titulo_grafico}</div>', unsafe_allow_html=True)
     fig_dual = go.Figure()
 
@@ -469,7 +443,6 @@ if vista_activa == "📊 Resumen & Evolución":
     anotaciones_totales = []
     lineas_estaciones = []
 
-    # Badges compactos de precio flotante
     for idx_row, row in df_trend.iterrows():
         p_val = row['PRECIO_POND']
         x_val = row[col_actual]
@@ -481,7 +454,6 @@ if vista_activa == "📊 Resumen & Evolución":
             font=dict(color="#9a3412", size=9, family="Arial")
         ))
 
-    # Delimitadores de Estaciones compactos debajo del eje
     if es_vista_mensual and not mes_en_drilldown:
         lista_meses = df_trend[col_actual].tolist()
         m_verano = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [1, 2, 3])]
@@ -515,7 +487,7 @@ if vista_activa == "📊 Resumen & Evolución":
         template='plotly_white',
         shapes=lineas_estaciones,
         annotations=anotaciones_totales,
-        height=240,  # Altura perfecta para no requerir scroll
+        height=240,
         margin=dict(t=20, b=55 if (es_vista_mensual and not mes_en_drilldown) else 25, l=8, r=8)
     )
 
@@ -537,7 +509,7 @@ if vista_activa == "📊 Resumen & Evolución":
             st.session_state.drilldown_mes = mes_detectado
             st.rerun()
 
-    # 2. FILA INFERIOR: MIX DE PRODUCTO + MATRIZ PERIÓDICA (Altura optimizada: 230px)
+    # FILA INFERIOR
     col_mix, col_matriz = st.columns([1, 1.35])
     
     with col_mix:
@@ -569,7 +541,7 @@ if vista_activa == "📊 Resumen & Evolución":
             autosize=True,
             template='plotly_white',
             showlegend=False,
-            height=230,  # Compacto para encajar en pantalla
+            height=230,
             margin=dict(t=5, b=5, l=5, r=5)
         )
         st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
@@ -595,7 +567,7 @@ if vista_activa == "📊 Resumen & Evolución":
         )
 
 # ==========================================================
-# HOJA 2: BENCHMARK & PREVISIÓN (ONE-PAGE PBI)
+# HOJA 2: BENCHMARK & PREVISIÓN (CON MATRIZ HISTÓRICA RESTABLECIDA)
 # ==========================================================
 else:
     meses_nombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic']
@@ -630,21 +602,18 @@ else:
             spread_historico = 2.74
         kco_dic_pred = round(mkt_dic_pred + (spread_historico * 0.95), 2)
 
-        # Etiquetas intercaladas
         text_mkt_intercalado = [f"<b>S/{val:.2f}</b>" if (pd.notna(val) and ((idx+1)%2 != 0 or (idx+1)==11)) else "" for idx, val in enumerate(mkt_2026_real[:11])]
         text_kco_intercalado = [f"<b>S/{val:.2f}</b>" if (pd.notna(val) and ((idx+1)%2 == 0 or (idx+1)==11)) else "" for idx, val in enumerate(kco_2026_real[:11])]
 
-        # 1. GRÁFICO SUPERIOR: BENCHMARK ANUAL (Altura optimizada: 230px)
+        # 1. GRÁFICO BENCHMARK ANUAL (220px)
         st.markdown('<div class="chart-header">🎯 Comparativo Anual de Precios: Mayorista vs KCO Retail & Previsión a Diciembre</div>', unsafe_allow_html=True)
         fig_anual = go.Figure()
 
-        # Mayorista 2025
         fig_anual.add_trace(go.Scatter(
             x=meses_nombres, y=mkt_2025, name='Mayorista 2025',
             mode='lines+markers', line=dict(color='#cbd5e1', width=1.5, dash='dot'),
             marker=dict(size=4, color='#cbd5e1'), hovertemplate="<b>%{x} (2025)</b>: S/ %{y:.2f}<extra></extra>"
         ))
-        # Mayorista 2026
         fig_anual.add_trace(go.Scatter(
             x=meses_nombres[:11], y=mkt_2026_real[:11], name='Mayorista 2026',
             mode='lines+markers+text', text=text_mkt_intercalado, textposition='bottom center',
@@ -652,14 +621,12 @@ else:
             line=dict(color='#475569', width=2.2), marker=dict(size=6, color='#475569'),
             hovertemplate="<b>%{x} Mayorista</b>: S/ %{y:.2f}<extra></extra>"
         ))
-        # Mayorista Proyección Dic
         fig_anual.add_trace(go.Scatter(
             x=['Nov', 'Dic'], y=[mkt_nov_val, mkt_dic_pred], name='Mayorista (Dic Proy)',
             mode='lines+markers+text', text=["", f"<b>S/{mkt_dic_pred:.2f}*</b>"], textposition='bottom center',
             textfont=dict(color='#64748b', size=9.5, family='Arial'), line=dict(color='#64748b', width=2, dash='dash'),
             marker=dict(size=7, symbol='diamond', color='#64748b'), hovertemplate="<b>Dic Proy Mayorista</b>: S/ %{y:.2f}<extra></extra>"
         ))
-        # KCO 2026
         fig_anual.add_trace(go.Scatter(
             x=meses_nombres[:11], y=kco_2026_real[:11], name='KCO Venta 2026',
             mode='lines+markers+text', text=text_kco_intercalado, textposition='top center',
@@ -667,7 +634,6 @@ else:
             line=dict(color='#1b4332', width=2.8), marker=dict(size=7, color='#1b4332'),
             hovertemplate="<b>%{x} KCO</b>: S/ %{y:.2f}<extra></extra>"
         ))
-        # KCO Proyección Dic
         fig_anual.add_trace(go.Scatter(
             x=['Nov', 'Dic'], y=[kco_nov_val, kco_dic_pred], name='KCO (Dic Proy)',
             mode='lines+markers+text', text=["", f"<b>S/{kco_dic_pred:.2f}*</b>"], textposition='top center',
@@ -676,7 +642,7 @@ else:
         ))
 
         fig_anual.update_layout(
-            autosize=True, template='plotly_white', height=230,
+            autosize=True, template='plotly_white', height=220,
             xaxis=dict(title='', categoryorder='array', categoryarray=meses_nombres, tickfont=dict(size=9.5, color='#1e293b')),
             yaxis=dict(title='Precio S/ /kg', gridcolor='#f1f5f9', zeroline=False, titlefont=dict(size=9.5), tickfont=dict(size=9)),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=9)),
@@ -684,7 +650,7 @@ else:
         )
         st.plotly_chart(fig_anual, use_container_width=True, config=PLOTLY_CONFIG)
 
-        # 2. FILA DE PREVISIONES COMPACTA EN LÍNEA
+        # 2. FILA DE PREVISIONES
         c_p1, c_p2, c_p3 = st.columns(3)
         with c_p1:
             st.markdown(f'<div class="metric-card" style="border-left-color: #64748b;"><div class="metric-title">Mayorista (Nov Real ➔ Dic Proy)</div><div class="metric-value">S/ {mkt_nov_val:.2f} ➔ S/ {mkt_dic_pred:.2f}</div><div class="metric-sub">Ajuste fin de año (-20.1%)</div></div>', unsafe_allow_html=True)
@@ -693,8 +659,8 @@ else:
         with c_p3:
             st.markdown(f'<div class="metric-card" style="border-left-color: #d97706;"><div class="metric-title">KCO Cotización Sugerida (Dic Proy)</div><div class="metric-value">S/ {kco_dic_pred:.2f} /kg</div><div class="metric-sub">Rango: S/ {kco_dic_pred - 0.30:.2f} - S/ {kco_dic_pred + 0.30:.2f}</div></div>', unsafe_allow_html=True)
 
-        # 3. FILA INFERIOR: BANDA DE PRECIOS Y VARIACIONES (Altura optimizada: 230px)
-        col_b1, col_b2 = st.columns([1.2, 1.3])
+        # 3. FILA MEDIA: BANDA DE NEGOCIACIÓN + AUDITORÍA DE VARIACIONES (220px)
+        col_b1, col_b2 = st.columns([1.1, 1.4])
         with col_b1:
             st.markdown('<div class="chart-header">🎯 Banda de Negociación por Variedad</div>', unsafe_allow_html=True)
             df_banda = df.groupby('DESCRIPCION_PRODUCTO').agg(PRECIO_MIN=('PRECIO_KG', 'min'), PRECIO_MAX=('PRECIO_KG', 'max'), KILOS=('KILOS_SOLICITADOS', 'sum'), VALOR=('VALOR_COMERCIAL', 'sum')).reset_index()
@@ -707,29 +673,72 @@ else:
             ))
             fig_banda.add_trace(go.Scatter(
                 name='Precio Pond', x=df_banda['DESCRIPCION_PRODUCTO'], y=df_banda['PRECIO_POND'], mode='markers+text',
-                text=df_banda['PRECIO_POND'].apply(lambda x: f"<b>S/{x:.2f}</b>"), textposition='top center', textfont=dict(color='#0f172a', size=9.5),
-                marker=dict(size=8, color=COLOR_ACCENT, symbol='diamond')
+                text=df_banda['PRECIO_POND'].apply(lambda x: f"<b>S/{x:.2f}</b>"), textposition='top center', textfont=dict(color='#0f172a', size=9),
+                marker=dict(size=7, color=COLOR_ACCENT, symbol='diamond')
             ))
-            fig_banda.update_layout(autosize=True, template='plotly_white', height=230, showlegend=False, yaxis=dict(title='Precio S/ /kg', titlefont=dict(size=9.5), tickfont=dict(size=9)), xaxis=dict(tickfont=dict(size=9)), margin=dict(t=15, b=20, l=8, r=8))
+            fig_banda.update_layout(autosize=True, template='plotly_white', height=210, showlegend=False, yaxis=dict(title='Precio S/ /kg', titlefont=dict(size=9), tickfont=dict(size=8.5)), xaxis=dict(tickfont=dict(size=8.5)), margin=dict(t=12, b=15, l=8, r=8))
             st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
 
-        with col_b2:
-            st.markdown('<div class="chart-header">🔍 Variaciones Recientes de Precio</div>', unsafe_allow_html=True)
-            df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(KG=('KILOS_SOLICITADOS', 'sum'), VALOR=('VALOR_COMERCIAL', 'sum')).reset_index()
-            df_prod_trend['PRECIO_POND'] = df_prod_trend['VALOR'] / df_prod_trend['KG']
-            df_prod_trend = df_prod_trend.sort_values(by=['DESCRIPCION_PRODUCTO', col_periodo])
-            df_prod_trend['PRECIO_PREV'] = df_prod_trend.groupby('DESCRIPCION_PRODUCTO')['PRECIO_POND'].shift(1)
-            df_prod_trend['VAR_PRECIO_PCT'] = ((df_prod_trend['PRECIO_POND'] - df_prod_trend['PRECIO_PREV']) / df_prod_trend['PRECIO_PREV']) * 100
-            df_changes = df_prod_trend[df_prod_trend['VAR_PRECIO_PCT'].notna() & (df_prod_trend['VAR_PRECIO_PCT'] != 0)].copy()
+        # Cálculo de cambios históricos de precio
+        df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(KG=('KILOS_SOLICITADOS', 'sum'), VALOR=('VALOR_COMERCIAL', 'sum')).reset_index()
+        df_prod_trend['PRECIO_POND'] = df_prod_trend['VALOR'] / df_prod_trend['KG']
+        df_prod_trend = df_prod_trend.sort_values(by=['DESCRIPCION_PRODUCTO', col_periodo])
+        df_prod_trend['PRECIO_PREV'] = df_prod_trend.groupby('DESCRIPCION_PRODUCTO')['PRECIO_POND'].shift(1)
+        df_prod_trend['VAR_PRECIO_PCT'] = ((df_prod_trend['PRECIO_POND'] - df_prod_trend['PRECIO_PREV']) / df_prod_trend['PRECIO_PREV']) * 100
+        df_prod_trend['DIF_SOLES'] = df_prod_trend['PRECIO_POND'] - df_prod_trend['PRECIO_PREV']
+        df_changes = df_prod_trend[df_prod_trend['VAR_PRECIO_PCT'].notna() & (df_prod_trend['VAR_PRECIO_PCT'] != 0)].copy()
 
+        with col_b2:
+            st.markdown('<div class="chart-header">📊 Historial de Variaciones de Precio (%)</div>', unsafe_allow_html=True)
             if not df_changes.empty:
                 fig_var = px.bar(
                     df_changes.tail(15), x=col_periodo, y='VAR_PRECIO_PCT', color='VAR_PRECIO_PCT',
                     text=df_changes.tail(15)['VAR_PRECIO_PCT'].apply(lambda x: f"<b>{x:+.1f}%</b>"),
                     color_continuous_scale='RdYlGn', custom_data=['DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND']
                 )
-                fig_var.update_traces(textposition='outside', outsidetextfont=dict(color='#0f172a', size=9.5))
-                fig_var.update_layout(autosize=True, template='plotly_white', height=230, coloraxis_showscale=False, yaxis=dict(title='Var %', titlefont=dict(size=9.5), tickfont=dict(size=9)), xaxis=dict(title='', tickangle=-30, tickfont=dict(size=9)), margin=dict(t=15, b=20, l=8, r=8))
+                fig_var.update_traces(textposition='outside', outsidetextfont=dict(color='#0f172a', size=9))
+                fig_var.update_layout(autosize=True, template='plotly_white', height=210, coloraxis_showscale=False, yaxis=dict(title='Var %', titlefont=dict(size=9), tickfont=dict(size=8.5)), xaxis=dict(title='', tickangle=-30, tickfont=dict(size=8.5)), margin=dict(t=12, b=15, l=8, r=8))
                 st.plotly_chart(fig_var, use_container_width=True, config=PLOTLY_CONFIG)
             else:
                 st.info("Sin variaciones en el periodo.")
+
+        # 4. MATRIZ HISTÓRICA RESTABLECIDA EN PESTAÑAS DEDICADAS
+        st.markdown('<div class="chart-header">📑 Tablas de Detalle: Matriz de Historial de Precios & Órdenes</div>', unsafe_allow_html=True)
+        sub_tab1, sub_tab2 = st.tabs([
+            "📋 Matriz de Historial de Cambios de Precio", 
+            "📦 Detalle General de Órdenes & Estimaciones"
+        ])
+
+        with sub_tab1:
+            if not df_changes.empty:
+                tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
+                tbl_c.columns = [label_periodo, 'Producto', 'Precio Anterior', 'Precio Actual', 'Diferencia S/', 'Variación %', 'Kilos del Periodo']
+                st.dataframe(
+                    tbl_c.sort_values(by=label_periodo, ascending=False).style.format({
+                        'Precio Anterior': 'S/ {:.2f}',
+                        'Precio Actual': 'S/ {:.2f}',
+                        'Diferencia S/': 'S/ {:+.2f}',
+                        'Variación %': '{:+.2f}%',
+                        'Kilos del Periodo': '{:,.0f} kg'
+                    })
+                    .map(style_semaphore, subset=['Variación %', 'Diferencia S/']),
+                    use_container_width=True, height=210, hide_index=True
+                )
+            else:
+                st.info("No hay variaciones de precios registradas en el rango seleccionado.")
+
+        with sub_tab2:
+            cols_grid = ['NRO_OC', 'FECHA_EMISION', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PRECIO_KG', 'VALOR_COMERCIAL', 'JABAS_EST', 'FRUTOS_EST']
+            df_grid = df[cols_grid].copy()
+            df_grid['FECHA_EMISION'] = df_grid['FECHA_EMISION'].dt.strftime('%d-%m-%Y')
+            
+            st.dataframe(
+                df_grid.style.format({
+                    'KILOS_SOLICITADOS': '{:,.0f} kg',
+                    'PRECIO_KG': 'S/ {:.2f}',
+                    'VALOR_COMERCIAL': 'S/ {:,.2f}',
+                    'JABAS_EST': '{:,.1f}',
+                    'FRUTOS_EST': '{:,.0f}'
+                }),
+                use_container_width=True, height=210, hide_index=True
+            )

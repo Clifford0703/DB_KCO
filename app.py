@@ -17,9 +17,9 @@ st.set_page_config(
 
 # --- PALETA CORPORATIVA ---
 COLOR_PRIMARY = "#1b4332"
-COLOR_BARRA_CLARA = "#52b788"      # Verde esmeralda luminoso para barras
-COLOR_BARRA_BORDE = "#2d6a4f"      # Contorno contrastado
-COLOR_ACCENT = "#d97706"           # Línea de precio en ámbar
+COLOR_BARRA_CLARA = "#52b788"
+COLOR_BARRA_BORDE = "#2d6a4f"
+COLOR_ACCENT = "#d97706"
 COLOR_NEUTRAL = "#0f172a"
 COLOR_INFO = "#0284c7"
 COLOR_MERCADO = "#64748b"
@@ -147,24 +147,20 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* ESTILIZACIÓN DEL SIDEBAR */
+    /* OPTIMIZACIÓN SIDEBAR (PANEL DE CONTROL COMPACTO) */
     section[data-testid="stSidebar"] {{
         background-color: #ffffff;
         border-right: 1px solid #e2e8f0;
     }}
-    section[data-testid="stSidebar"] .stMarkdown h3 {{
-        color: {COLOR_PRIMARY};
-        font-size: 16px !important;
-        font-weight: 800;
-        margin-top: 0px !important;
-        margin-bottom: 8px !important;
+    section[data-testid="stSidebar"] .block-container {{
+        padding-top: 1.8rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }}
-    .sidebar-card {{
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 12px;
-        margin-bottom: 14px;
+    section[data-testid="stSidebar"] .stDateInput, 
+    section[data-testid="stSidebar"] .stMultiSelect, 
+    section[data-testid="stSidebar"] .stRadio {{
+        margin-bottom: 0.6rem !important;
     }}
 
     /* CONTROL SEGMENTADO TÁCTIL */
@@ -320,36 +316,25 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR: FILTROS LATERALES FORMATEADOS ---
+# --- SIDEBAR: PANEL DE CONTROL OPTIMIZADO (SIN ESPACIOS VACÍOS) ---
 with st.sidebar:
     st.markdown("### 🥑 Panel de Control")
-    st.caption("Configura los parámetros de visualización")
-    st.markdown("---")
+    st.caption("Filtros y parámetros operativos")
     
-    st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
-    st.markdown("**📅 Rango de Fechas**")
     min_date, max_date = df_raw['FECHA_EMISION'].min(), df_raw['FECHA_EMISION'].max()
-    date_range = st.date_input("Periodo de Emisión", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
+    date_range = st.date_input("📅 Rango de Fechas", value=(min_date, max_date), min_value=min_date, max_value=max_date)
     
-    st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
-    st.markdown("**🏷️ Variedad / Calibre**")
     prods = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
-    selected_prods = st.multiselect("Variedad", options=prods, default=prods, label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
+    selected_prods = st.multiselect("🏷️ Variedad / Calibre", options=prods, default=prods)
     
-    st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
-    st.markdown("**⏱️ Agrupación Temporal**")
     periodo_seleccionado = st.radio(
-        "Frecuencia",
+        "⏱️ Agrupación Temporal",
         options=["Mensual", "Semanal"],
-        horizontal=True,
-        label_visibility="collapsed"
+        horizontal=True
     )
-    st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown("---")
-    st.caption("KCO Group | Intelligence & Operations")
+    st.divider()
+    st.caption("KCO Group — Intelligence & Pricing")
 
 col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
 label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
@@ -477,7 +462,7 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # 1. GRÁFICO A TODO EL ANCHO: ESTACIONES DEL AÑO DEBAJO DE LOS MESES
+    # 1. GRÁFICO A TODO EL ANCHO: ESTACIONES DEL AÑO SIN COLOR, SOLO LÍNEAS LEVES Y NOMBRES DEBAJO
     st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
     fig_dual = go.Figure()
 
@@ -522,8 +507,9 @@ if vista_activa == "📊 Resumen & Evolución":
     ))
 
     anotaciones_estaciones = []
+    lineas_estaciones = []
 
-    # ESTACIONES DEL AÑO EN EL PERÚ: SOMBREADO + ETIQUETAS DEBAJO DEL EJE X
+    # ESTACIONES DEL AÑO EN EL PERÚ: SOLO LÍNEA GUÍA LEVE Y NOMBRES DEBAJO DEL EJE X
     if periodo_seleccionado == "Mensual":
         lista_meses = df_trend[col_periodo].tolist()
         
@@ -532,53 +518,42 @@ if vista_activa == "📊 Resumen & Evolución":
         m_invierno = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [7, 8, 9])]
         m_primavera = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [10, 11, 12])]
 
-        if m_verano:
-            fig_dual.add_vrect(x0=m_verano[0], x1=m_verano[-1], fillcolor="rgba(254, 240, 138, 0.15)", layer="below", line_width=0)
+        def agregar_delimitador_estacion(meses_est, nombre_est, color_txt):
+            if not meses_est:
+                return
+            ini = meses_est[0]
+            fin = meses_est[-1]
+            med = meses_est[len(meses_est)//2]
+            
+            # Línea horizontal tenue que abarca de inicio a fin de la estación
+            lineas_estaciones.append(dict(
+                type="line", xref="x", yref="paper",
+                x0=ini, x1=fin, y0=-0.14, y1=-0.14,
+                line=dict(color="#cbd5e1", width=1.5, dash="dot")
+            ))
+            # Pequeño tope vertical al inicio
+            lineas_estaciones.append(dict(
+                type="line", xref="x", yref="paper",
+                x0=ini, x1=ini, y0=-0.12, y1=-0.16,
+                line=dict(color="#cbd5e1", width=1.5)
+            ))
+            # Pequeño tope vertical al final
+            lineas_estaciones.append(dict(
+                type="line", xref="x", yref="paper",
+                x0=fin, x1=fin, y0=-0.12, y1=-0.16,
+                line=dict(color="#cbd5e1", width=1.5)
+            ))
+            # Nombre centrado debajo del tramo
             anotaciones_estaciones.append(dict(
-                x=m_verano[len(m_verano)//2], y=-0.16, xref='x', yref='paper',
-                text="☀️ Verano", showarrow=False,
-                font=dict(size=11, color="#854d0e", weight="bold")
+                x=med, y=-0.21, xref='x', yref='paper',
+                text=nombre_est, showarrow=False,
+                font=dict(size=11, color=color_txt, weight="bold")
             ))
 
-        if m_otono:
-            fig_dual.add_vrect(x0=m_otono[0], x1=m_otono[-1], fillcolor="rgba(254, 215, 170, 0.15)", layer="below", line_width=0)
-            anotaciones_estaciones.append(dict(
-                x=m_otono[len(m_otono)//2], y=-0.16, xref='x', yref='paper',
-                text="🍂 Otoño", showarrow=False,
-                font=dict(size=11, color="#9a3412", weight="bold")
-            ))
-
-        if m_invierno:
-            fig_dual.add_vrect(x0=m_invierno[0], x1=m_invierno[-1], fillcolor="rgba(224, 242, 254, 0.25)", layer="below", line_width=0)
-            anotaciones_estaciones.append(dict(
-                x=m_invierno[len(m_invierno)//2], y=-0.16, xref='x', yref='paper',
-                text="❄️ Invierno", showarrow=False,
-                font=dict(size=11, color="#0369a1", weight="bold")
-            ))
-
-        if m_primavera:
-            fig_dual.add_vrect(x0=m_primavera[0], x1=m_primavera[-1], fillcolor="rgba(220, 252, 231, 0.20)", layer="below", line_width=0)
-            anotaciones_estaciones.append(dict(
-                x=m_primavera[len(m_primavera)//2], y=-0.16, xref='x', yref='paper',
-                text="🌸 Primavera", showarrow=False,
-                font=dict(size=11, color="#15803d", weight="bold")
-            ))
-
-        # Ventana de Mayor Demanda / Cosecha Alta (Mayo - Setiembre)
-        m_alta = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in range(5, 10))]
-        if m_alta:
-            fig_dual.add_vrect(
-                x0=m_alta[0],
-                x1=m_alta[-1],
-                fillcolor="rgba(34, 197, 94, 0.08)",
-                layer="below",
-                line_width=1.5,
-                line_dash="dot",
-                line_color="rgba(21, 128, 61, 0.6)",
-                annotation_text="🔥 Temporada Alta & Mayor Demanda",
-                annotation_position="top left",
-                annotation_font=dict(size=10.5, color="#15803d", weight="bold")
-            )
+        agregar_delimitador_estacion(m_verano, "☀️ Verano", "#854d0e")
+        agregar_delimitador_estacion(m_otono, "🍂 Otoño", "#9a3412")
+        agregar_delimitador_estacion(m_invierno, "❄️ Invierno", "#0369a1")
+        agregar_delimitador_estacion(m_primavera, "🌸 Primavera", "#15803d")
 
     fig_dual.update_layout(
         autosize=True,
@@ -587,9 +562,10 @@ if vista_activa == "📊 Resumen & Evolución":
         yaxis2=dict(title='Precio Pond. (S/ /kg)', overlaying='y', side='right', showgrid=True),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         template='plotly_white',
+        shapes=lineas_estaciones,
         annotations=anotaciones_estaciones,
         height=470,
-        margin=dict(t=40, b=55, l=10, r=10)
+        margin=dict(t=40, b=65, l=10, r=10)
     )
     st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
     
@@ -598,8 +574,8 @@ if vista_activa == "📊 Resumen & Evolución":
     st.markdown(f"""
     <div class="chart-insight">
         💡 <b>Diagnóstico de Estacionalidad & Ventas:</b><br>
-        • <b>Comportamiento en Temporada Alta (Mayo - Setiembre):</b> La franja punteada resalta la ventana estacional de mayor consumo y cosecha. Tus despachos alcanzaron su pico absoluto en <b>{max_vol_row[col_periodo]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs), demostrando que tu abastecimiento estuvo <b>100% alineado a la temporada de alta demanda</b>.<br>
-        • <b>Comportamiento en Temporada Baja (Octubre - Noviembre):</b> La oferta mayorista se contrae y el precio ponderado de venta trepó a su máximo de <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b> en <b>{max_p_row[col_periodo]}</b>.
+        • <b>Temporada Alta (Otoño/Invierno):</b> Tus despachos alcanzaron su pico absoluto en <b>{max_vol_row[col_periodo]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs), coincidiendo con la ventana de mayor abastecimiento mayorista.<br>
+        • <b>Temporada Baja (Primavera):</b> La oferta mayorista se contrae y el precio ponderado de venta trepó a su máximo de <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b> en <b>{max_p_row[col_periodo]}</b>.
     </div>
     """, unsafe_allow_html=True)
 

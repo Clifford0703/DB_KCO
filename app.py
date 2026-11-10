@@ -47,19 +47,19 @@ st.markdown(f"""
     .block-container {{
         max-width: 100% !important;
         padding-top: 0.2rem !important;
-        padding-bottom: 0.6rem !important;
+        padding-bottom: 2rem !important;
         padding-left: 0.8rem !important;
         padding-right: 0.8rem !important;
     }}
 
-    /* BARRA SUPERIOR CON MARGEN DE SEGURIDAD CONTRA ICONOS DEL SISTEMA */
+    /* BARRA SUPERIOR CON MARGEN DE SEGURIDAD */
     .header-bar {{
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding: 4px 6px;
         margin-left: 36px;   /* Deja libre la flecha del sidebar */
-        margin-right: 170px; /* Deja libre los botones Share, Star, GitHub de Streamlit */
+        margin-right: 170px; /* Deja libre los botones de Streamlit Cloud */
         margin-bottom: 6px;
     }}
     .header-title {{
@@ -81,7 +81,7 @@ st.markdown(f"""
     }}
     
     .chart-header {{
-        font-size: 11.5px;
+        font-size: 12px;
         font-weight: 700;
         color: #1e293b;
         margin-top: 3px;
@@ -91,7 +91,7 @@ st.markdown(f"""
         gap: 5px;
     }}
 
-    /* TARJETAS KPI DE ALTO IMPACTO VISUAL */
+    /* TARJETAS KPI DE ALTO IMPACTO */
     .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -187,18 +187,43 @@ st.markdown(f"""
     .kpi-jabas .kpi-badge {{ background: #d1fae5; color: #047857; }}
     .kpi-jabas .kpi-sub {{ color: #059669; }}
 
+    /* INSIGHT CARDS EJECUTIVOS */
+    .chart-insight {{
+        background-color: #ffffff;
+        border-left: 4px solid #059669;
+        border-right: 1px solid #e2e8f0;
+        border-top: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 9px 13px;
+        border-radius: 7px;
+        font-size: 11.5px;
+        color: #334155;
+        margin-top: 6px;
+        margin-bottom: 12px;
+        line-height: 1.45;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }}
+    .insight-title {{
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 3px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }}
+
     .drilldown-bar {{
         background: #e0f2fe;
         border-left: 3.5px solid #0284c7;
-        padding: 4px 10px;
+        padding: 5px 10px;
         border-radius: 6px;
-        font-size: 11px;
+        font-size: 11.5px;
         font-weight: 700;
         color: #0369a1;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 4px;
+        margin-bottom: 5px;
     }}
 
     /* SELECTOR DE VISTAS ESTILO TABS PBI */
@@ -318,7 +343,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR (FILTROS CON OPCIÓN 'TODOS' LIMPIA) ---
+# --- SIDEBAR (FILTRO 'TODOS' LIMPIO) ---
 with st.sidebar:
     st.markdown("### 🥑 Panel de Segmentación")
     min_date, max_date = df_raw['FECHA_EMISION'].min(), df_raw['FECHA_EMISION'].max()
@@ -333,7 +358,6 @@ with st.sidebar:
         default=["(Todas las variedades)"]
     )
     
-    # Lógica limpia: Si está "(Todas las variedades)" o vacío, toma todas
     if "(Todas las variedades)" in filtro_seleccionado or len(filtro_seleccionado) == 0:
         selected_prods = prods_reales
     else:
@@ -363,7 +387,7 @@ if df.empty:
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
-# --- HEADER DESPEJADO (SIN INTERFERENCIA DE ICONOS DEL NAVEGADOR) ---
+# --- HEADER DESPEJADO ---
 st.markdown(f"""
     <div class="header-bar">
         <div class="header-title">
@@ -376,7 +400,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- KPIS DE ALTO IMPACTO (5 CARDS DESTACADAS) ---
+# --- KPIS DE ALTO IMPACTO ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -429,7 +453,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- SELECTOR DE HOJAS CON BOTÓN DE PANTALLA COMPLETA TOTALMENTE LIBRE Y ACCESIBLE ---
+# --- SELECTOR DE HOJAS CON BOTÓN FULLSCREEN ACCESIBLE ---
 col_tabs, col_fs_btn = st.columns([9.2, 0.45])
 
 with col_tabs:
@@ -517,12 +541,11 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # Si es vista semanal general, mostrar por default las últimas 20 semanas de forma limpia
     if periodo_seleccionado == "Semanal" and not mes_en_drilldown:
         if len(df_trend) > 20:
             df_trend = df_trend.tail(20).reset_index(drop=True)
 
-    # GRÁFICO SUPERIOR
+    # 1. GRÁFICO SUPERIOR: EVOLUCIÓN
     st.markdown(f'<div class="chart-header">📈 {titulo_grafico}</div>', unsafe_allow_html=True)
     fig_dual = go.Figure()
 
@@ -565,7 +588,6 @@ if vista_activa == "📊 Resumen & Evolución":
             font=dict(color="#9a3412", size=8.5, family="Arial")
         ))
 
-    # ESTACIONES DEL AÑO CON AMPLIO ESPACIADO PARA NO TOCAR LOS MESES
     if es_vista_mensual and not mes_en_drilldown:
         lista_meses = df_trend[col_actual].tolist()
         m_verano = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in [1, 2, 3])]
@@ -579,7 +601,6 @@ if vista_activa == "📊 Resumen & Evolución":
             ini = meses_est[0]
             fin = meses_est[-1]
             
-            # Línea guía en y=-0.28 (despeja totalmente la fila de texto de los meses)
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
                 x0=ini, x1=fin, y0=-0.28, y1=-0.28,
@@ -596,7 +617,6 @@ if vista_activa == "📊 Resumen & Evolución":
                 line=dict(color="#94a3b8", width=1.2)
             ))
             
-            # Texto de la estación en y=-0.44 con margen generoso
             idx_med = int(round((lista_meses.index(ini) + lista_meses.index(fin)) / 2))
             anotaciones_totales.append(dict(
                 x=lista_meses[idx_med], y=-0.44, xref='x', yref='paper',
@@ -646,7 +666,18 @@ if vista_activa == "📊 Resumen & Evolución":
             st.session_state.drilldown_mes = mes_detectado
             st.rerun()
 
-    # FILA INFERIOR
+    # INSIGHT 1: EVOLUCIÓN Y ESTACIONALIDAD
+    max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
+    max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
+    st.markdown(f"""
+        <div class="chart-insight">
+            <div class="insight-title">💡 Diagnóstico Operativo & Estacionalidad ({label_actual}):</div>
+            • <b>Pico de Abastecimiento:</b> El mayor volumen se concentró en <b>{max_vol_row[col_actual]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs despachadas), alineándose al ciclo de alta demanda de cosecha.<br>
+            • <b>Presión de Precios:</b> La cotización ponderada más elevada se registró en <b>{max_p_row[col_actual]}</b> alcanzando <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b> (+{max_p_row['VAR_PRECIO_PCT']:+.1f}% vs periodo previo), coincidiendo con la contracción de oferta mayorista.
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 2. FILA INFERIOR: MIX DE PRODUCTO + MATRIZ PERIÓDICA
     col_mix, col_matriz = st.columns([1, 1.35])
     
     with col_mix:
@@ -683,6 +714,15 @@ if vista_activa == "📊 Resumen & Evolución":
         )
         st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
 
+        # INSIGHT 2: MIX DE PRODUCTOS
+        top_prod = df_prod.iloc[0]
+        st.markdown(f"""
+            <div class="chart-insight" style="margin-top: 4px;">
+                <div class="insight-title">📌 Concentración de Portafolio:</div>
+                La variedad <b>{top_prod['DESCRIPCION_PRODUCTO']}</b> lidera la facturación representando el <b>{top_prod['PART_VALOR']:.1f}%</b> del valor bruto (S/ {top_prod['VALOR']:,.0f}) con un precio ponderado de <b>S/ {top_prod['PRECIO_POND']:.2f}/kg</b>.
+            </div>
+        """, unsafe_allow_html=True)
+
     with col_matriz:
         st.markdown(f'<div class="chart-header">📋 Variación Periódica ({label_actual})</div>', unsafe_allow_html=True)
         df_var_display = df_trend[[col_actual, 'KG_TOTALES', 'VAR_KG_PCT', 'PRECIO_POND', 'VAR_PRECIO_PCT', 'VALOR_TOTAL', 'VAR_VALOR_PCT', 'ORDENES']].copy()
@@ -702,6 +742,15 @@ if vista_activa == "📊 Resumen & Evolución":
             .highlight_null(color='#f1f5f9'),
             use_container_width=True, height=225, hide_index=True
         )
+
+        # INSIGHT 3: MATRIZ
+        prom_var_precio = df_trend['VAR_PRECIO_PCT'].mean()
+        st.markdown(f"""
+            <div class="chart-insight" style="margin-top: 4px;">
+                <div class="insight-title">📊 Auditoría de Desempeño:</div>
+                La volatilidad interperiódica promedio de precio fue de <b>{prom_var_precio:+.1f}%</b>. Las celdas en verde reflejan ventanas de captura de mayor margen por kilogramo despachado frente al periodo previo.
+            </div>
+        """, unsafe_allow_html=True)
 
 # ==========================================================
 # HOJA 2: BENCHMARK & PREVISIÓN
@@ -796,6 +845,14 @@ else:
         with c_p3:
             st.markdown(f'<div class="kpi-card kpi-precio"><div class="kpi-title">KCO Sugerido (Dic Proy)</div><div class="kpi-value" style="font-size:16px;">S/ {kco_dic_pred:.2f} /kg</div><div class="kpi-sub">Rango: S/ {kco_dic_pred - 0.30:.2f} - S/ {kco_dic_pred + 0.30:.2f}</div></div>', unsafe_allow_html=True)
 
+        # INSIGHT 4: ESTRATEGIA PRICING BENCHMARK
+        st.markdown(f"""
+            <div class="chart-insight">
+                <div class="insight-title">💡 Estrategia de Pricing Proyectada (Diciembre):</div>
+                El ingreso de fruta temprana de valles costeros empuja a la baja el costo mayorista hacia <b>S/ {mkt_dic_pred:.2f} /kg</b>. Mantener la cotización objetivo al cliente en <b>S/ {kco_dic_pred:.2f} /kg</b> protege tu spread comercial promedio de <b>S/ {spread_historico:.2f}/kg</b> frente a competidores directos.
+            </div>
+        """, unsafe_allow_html=True)
+
         # 3. BANDA DE PRECIOS Y VARIACIONES
         col_b1, col_b2 = st.columns([1.1, 1.4])
         with col_b1:
@@ -815,6 +872,15 @@ else:
             ))
             fig_banda.update_layout(autosize=True, template='plotly_white', height=205, showlegend=False, yaxis=dict(title='Precio S/ /kg', titlefont=dict(size=8.5), tickfont=dict(size=8)), xaxis=dict(tickfont=dict(size=8)), margin=dict(t=10, b=15, l=8, r=8))
             st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
+
+            # INSIGHT 5: BANDA
+            spread_max_var = (df_banda['PRECIO_MAX'] - df_banda['PRECIO_MIN']).max()
+            st.markdown(f"""
+                <div class="chart-insight" style="margin-top: 4px;">
+                    <div class="insight-title">🎯 Dispersión de Precios:</div>
+                    La dispersión máxima pactada entre piso y techo alcanza <b>S/ {spread_max_var:.2f}/kg</b>. Los diamantes representan el precio real ponderado por volumen.
+                </div>
+            """, unsafe_allow_html=True)
 
         # Cálculo de variaciones
         df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(KG=('KILOS_SOLICITADOS', 'sum'), VALOR=('VALOR_COMERCIAL', 'sum')).reset_index()
@@ -838,6 +904,14 @@ else:
                 st.plotly_chart(fig_var, use_container_width=True, config=PLOTLY_CONFIG)
             else:
                 st.info("Sin variaciones en el periodo.")
+
+            # INSIGHT 6: CAMBIOS DE PRECIO
+            st.markdown(f"""
+                <div class="chart-insight" style="margin-top: 4px;">
+                    <div class="insight-title">📈 Sensibilidad de Cotización:</div>
+                    Monitorea los ajustes directos acordados en órdenes consecutivas. Las barras rojas identifican concesiones de precio y las verdes incrementos netos.
+                </div>
+            """, unsafe_allow_html=True)
 
         # 4. MATRIZ DE HISTORIAL DE CAMBIOS DE PRECIO EN EXPANDER DESPLEGABLE
         with st.expander("📋 Ver Matriz Histórica de Cambios de Precio"):

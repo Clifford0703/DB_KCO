@@ -17,9 +17,9 @@ st.set_page_config(
 
 # --- PALETA CORPORATIVA ---
 COLOR_PRIMARY = "#1b4332"
-COLOR_BARRA_CLARA = "#52b788"
-COLOR_BARRA_BORDE = "#2d6a4f"
-COLOR_ACCENT = "#d97706"
+COLOR_BARRA_CLARA = "#52b788"      # Verde esmeralda luminoso para barras
+COLOR_BARRA_BORDE = "#2d6a4f"      # Contorno contrastado
+COLOR_ACCENT = "#d97706"           # Línea de precio en ámbar
 COLOR_NEUTRAL = "#0f172a"
 COLOR_INFO = "#0284c7"
 COLOR_MERCADO = "#64748b"
@@ -316,7 +316,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR: PANEL DE CONTROL OPTIMIZADO (SIN ESPACIOS VACÍOS) ---
+# --- SIDEBAR: PANEL DE CONTROL OPTIMIZADO ---
 with st.sidebar:
     st.markdown("### 🥑 Panel de Control")
     st.caption("Filtros y parámetros operativos")
@@ -462,7 +462,7 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # 1. GRÁFICO A TODO EL ANCHO: ESTACIONES DEL AÑO SIN COLOR, SOLO LÍNEAS LEVES Y NOMBRES DEBAJO
+    # 1. GRÁFICO A TODO EL ANCHO: ESTACIONES PEGADAS DIRECTAMENTE AL EJE X
     st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
     fig_dual = go.Figure()
 
@@ -509,7 +509,7 @@ if vista_activa == "📊 Resumen & Evolución":
     anotaciones_estaciones = []
     lineas_estaciones = []
 
-    # ESTACIONES DEL AÑO EN EL PERÚ: SOLO LÍNEA GUÍA LEVE Y NOMBRES DEBAJO DEL EJE X
+    # DELIMITADORES PEGADOS DEBAJO DE LAS ETIQUETAS DE LOS MESES
     if periodo_seleccionado == "Mensual":
         lista_meses = df_trend[col_periodo].tolist()
         
@@ -525,29 +525,29 @@ if vista_activa == "📊 Resumen & Evolución":
             fin = meses_est[-1]
             med = meses_est[len(meses_est)//2]
             
-            # Línea horizontal tenue que abarca de inicio a fin de la estación
+            # Línea horizontal tenue inmediatamente debajo de los meses
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
-                x0=ini, x1=fin, y0=-0.14, y1=-0.14,
+                x0=ini, x1=fin, y0=-0.055, y1=-0.055,
                 line=dict(color="#cbd5e1", width=1.5, dash="dot")
             ))
             # Pequeño tope vertical al inicio
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
-                x0=ini, x1=ini, y0=-0.12, y1=-0.16,
+                x0=ini, x1=ini, y0=-0.045, y1=-0.065,
                 line=dict(color="#cbd5e1", width=1.5)
             ))
             # Pequeño tope vertical al final
             lineas_estaciones.append(dict(
                 type="line", xref="x", yref="paper",
-                x0=fin, x1=fin, y0=-0.12, y1=-0.16,
+                x0=fin, x1=fin, y0=-0.045, y1=-0.065,
                 line=dict(color="#cbd5e1", width=1.5)
             ))
-            # Nombre centrado debajo del tramo
+            # Nombre centrado pegado a la línea
             anotaciones_estaciones.append(dict(
-                x=med, y=-0.21, xref='x', yref='paper',
+                x=med, y=-0.098, xref='x', yref='paper',
                 text=nombre_est, showarrow=False,
-                font=dict(size=11, color=color_txt, weight="bold")
+                font=dict(size=10.5, color=color_txt, weight="bold")
             ))
 
         agregar_delimitador_estacion(m_verano, "☀️ Verano", "#854d0e")
@@ -564,8 +564,8 @@ if vista_activa == "📊 Resumen & Evolución":
         template='plotly_white',
         shapes=lineas_estaciones,
         annotations=anotaciones_estaciones,
-        height=470,
-        margin=dict(t=40, b=65, l=10, r=10)
+        height=450,
+        margin=dict(t=40, b=42, l=10, r=10)
     )
     st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
     

@@ -17,7 +17,7 @@ st.set_page_config(
 
 # --- PALETA CORPORATIVA ---
 COLOR_PRIMARY = "#1b4332"
-COLOR_BARRA_CLARA = "#52b788"      # Verde esmeralda luminoso para barras
+COLOR_BARRA_CLARA = "#52b788"      # Verde esmeralda luminoso
 COLOR_BARRA_BORDE = "#2d6a4f"      # Contorno contrastado
 COLOR_ACCENT = "#d97706"           # Línea de precio en ámbar
 COLOR_NEUTRAL = "#0f172a"
@@ -125,19 +125,18 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* BARRA DE DRILL-DOWN / BREADCRUMB */
     .drilldown-bar {{
         background: #e0f2fe;
         border-left: 4px solid #0284c7;
-        padding: 8px 14px;
-        border-radius: 6px;
-        font-size: 13px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-size: 13.5px;
         font-weight: 700;
         color: #0369a1;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
     }}
     
     .header-metadata {{
@@ -162,7 +161,7 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* OPTIMIZACIÓN SIDEBAR */
+    /* SIDEBAR COMPACTO */
     section[data-testid="stSidebar"] {{
         background-color: #ffffff;
         border-right: 1px solid #e2e8f0;
@@ -254,7 +253,7 @@ PLOTLY_CONFIG = {
     'responsive': True
 }
 
-# --- ESTADO DE SESIÓN PARA DRILL-DOWN ---
+# --- CONTROL DE ESTADO DE SESIÓN PARA DRILL-DOWN ---
 if 'drilldown_mes' not in st.session_state:
     st.session_state.drilldown_mes = None
 
@@ -335,7 +334,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR: PANEL DE CONTROL OPTIMIZADO ---
+# --- SIDEBAR: PANEL DE CONTROL ---
 with st.sidebar:
     st.markdown("### 🥑 Panel de Control")
     st.caption("Filtros y parámetros operativos")
@@ -347,7 +346,7 @@ with st.sidebar:
     selected_prods = st.multiselect("🏷️ Variedad / Calibre", options=prods, default=prods)
     
     periodo_seleccionado = st.radio(
-        "⏱️ Agrupación Temporal Base",
+        "⏱️ Agrupación Temporal",
         options=["Mensual", "Semanal"],
         horizontal=True
     )
@@ -368,6 +367,10 @@ if selected_prods:
 if df.empty:
     st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
     st.stop()
+
+# Si se cambia el radio de agrupación a Semanal desde el sidebar, se reinicia cualquier drilldown
+if periodo_seleccionado == "Semanal":
+    st.session_state.drilldown_mes = None
 
 # --- HEADER PRINCIPAL ---
 st.markdown('<div class="dashboard-title">🥑 KCO Group | Intelligence & Pricing Dashboard</div>', unsafe_allow_html=True)
@@ -470,39 +473,35 @@ st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
 # ==========================================================
 if vista_activa == "📊 Resumen & Evolución":
     
-    # CONTROL DE ESTADO DE DRILL-DOWN
     es_vista_mensual = (periodo_seleccionado == "Mensual")
     mes_en_drilldown = st.session_state.drilldown_mes if es_vista_mensual else None
 
-    # Botón / Miga de Pan para regresar a la vista general si hay drilldown activo
+    # Miga de pan / Botón de retorno exclusivo cuando se está dentro de un mes
     if es_vista_mensual and mes_en_drilldown:
         col_bread1, col_bread2 = st.columns([3, 1])
         with col_bread1:
             st.markdown(f"""
                 <div class="drilldown-bar">
-                    <span>🔍 Analizando semanas del mes: <b>{mes_en_drilldown}</b></span>
-                    <span style="font-size:11px; color:#0369a1;">(Toca el botón a la derecha para ver todos los meses)</span>
+                    <span>🔍 Vista Semanal activa del mes: <b>{mes_en_drilldown}</b></span>
                 </div>
             """, unsafe_allow_html=True)
         with col_bread2:
-            if st.button("⬅️ Ver todos los meses", use_container_width=True):
+            if st.button("⬅️ Volver a vista mensual", use_container_width=True, type="primary"):
                 st.session_state.drilldown_mes = None
                 st.rerun()
 
-    # Preparamos el DataFrame según si estamos en modo general o modo Drill-Down de un mes
+    # Selección de datos: mes específico o general
     if es_vista_mensual and mes_en_drilldown:
-        # Modo Drill-Down: filtramos únicamente ese mes y agrupamos por SEMANA
         df_target = df[df['MES_AÑO'] == mes_en_drilldown].copy()
         col_actual = 'SEMANA_AÑO'
         label_actual = f"Semana de {mes_en_drilldown}"
-        titulo_grafico = f"Desglose Semanal de {mes_en_drilldown}: Volumen (Tn) vs Precio Ponderado (S/)"
+        titulo_grafico = f"Evolución Semanal de {mes_en_drilldown}: Volumen (Tn) vs Precio Ponderado (S/)"
     else:
-        # Modo General
         df_target = df.copy()
         col_actual = col_periodo
         label_actual = label_periodo
-        sub_indicador = " [💡 Haz clic en una barra para ver sus semanas]" if es_vista_mensual else ""
-        titulo_grafico = f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/){sub_indicador}"
+        hint = " — (Toca o haz clic en una barra para ver sus semanas)" if es_vista_mensual else ""
+        titulo_grafico = f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/){hint}"
 
     df_trend = df_target.groupby(col_actual).agg(
         KG_TOTALES=('KILOS_SOLICITADOS', 'sum'),
@@ -537,7 +536,7 @@ if vista_activa == "📊 Resumen & Evolución":
             "📦 Volumen Solicitado: <b>%{y:.2f} Tn</b> (%{customdata[0]:,.0f} kg)<br>" +
             "📋 Órdenes de Compra: %{customdata[1]:,}<br>" +
             "💰 Facturación: S/ %{customdata[2]:,.2f}<br>" +
-            ("👉 <i>Toca para ver el desglose semanal</i>" if (es_vista_mensual and not mes_en_drilldown) else "") +
+            ("👉 <b>Haz clic para abrir el desglose semanal</b>" if (es_vista_mensual and not mes_en_drilldown) else "") +
             "<extra></extra>"
         ),
         customdata=np.stack((df_trend['KG_TOTALES'], df_trend['ORDENES'], df_trend['VALOR_TOTAL']), axis=-1),
@@ -565,7 +564,7 @@ if vista_activa == "📊 Resumen & Evolución":
     anotaciones_estaciones = []
     lineas_estaciones = []
 
-    # Delimitadores de Estaciones (SOLO si estamos en vista mensual general)
+    # Delimitadores de Estaciones en vista mensual general
     if es_vista_mensual and not mes_en_drilldown:
         lista_meses = df_trend[col_actual].tolist()
         
@@ -614,6 +613,7 @@ if vista_activa == "📊 Resumen & Evolución":
 
     fig_dual.update_layout(
         autosize=True,
+        clickmode='event+select',
         xaxis=dict(title='', tickangle=-30 if (periodo_seleccionado == "Semanal" or mes_en_drilldown) else 0),
         yaxis=dict(title='Volumen Total (Tn)', showgrid=False),
         yaxis2=dict(title='Precio Pond. (S/ /kg)', overlaying='y', side='right', showgrid=True),
@@ -625,46 +625,33 @@ if vista_activa == "📊 Resumen & Evolución":
         margin=dict(t=40, b=80 if (es_vista_mensual and not mes_en_drilldown) else 45, l=10, r=10)
     )
 
-    # DETECCIÓN DE CLIC EN LA BARRA (Streamlit >= 1.35 con fallback seguro)
-    try:
-        chart_event = st.plotly_chart(
-            fig_dual,
-            use_container_width=True,
-            config=PLOTLY_CONFIG,
-            on_select="rerun",
-            selection_mode="points"
-        )
-        # Si el usuario hizo clic en una barra del gráfico
-        if es_vista_mensual and not mes_en_drilldown and chart_event:
-            puntos = chart_event.get("selection", {}).get("points", [])
-            if puntos and len(puntos) > 0:
-                mes_click = puntos[0].get("x")
-                if mes_click and mes_click in df['MES_AÑO'].unique():
-                    st.session_state.drilldown_mes = mes_click
-                    st.rerun()
-    except Exception:
-        # Fallback para versiones antiguas de Streamlit
-        st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
+    # CAPTURA ROBUSTA DEL CLIC MEDIANTE KEY Y STREAMLIT SELECTION
+    chart_key = "grafico_mensual_interactivo" if not mes_en_drilldown else "grafico_semanal_drilldown"
+    
+    chart_event = st.plotly_chart(
+        fig_dual,
+        use_container_width=True,
+        config=PLOTLY_CONFIG,
+        key=chart_key,
+        on_select="rerun",
+        selection_mode="points"
+    )
 
-    # SELECTOR DE DRILL-DOWN PARA MÓVILES (Facilidad táctil cuando tocar la barra es difícil)
-    if es_vista_mensual and not mes_en_drilldown:
-        col_d1, col_d2 = st.columns([1.5, 2])
-        with col_d1:
-            meses_disp = ["(Selecciona un mes para ver sus semanas)"] + sorted(df['MES_AÑO'].unique().tolist())
-            elegido = st.selectbox(
-                "🔎 O selecciona aquí el mes para desglose semanal:",
-                options=meses_disp,
-                index=0
-            )
-            if elegido != "(Selecciona un mes para ver sus semanas)":
-                st.session_state.drilldown_mes = elegido
+    # Si estamos en la vista mensual y el usuario hace clic en una barra
+    if es_vista_mensual and not mes_en_drilldown and chart_event:
+        selection_data = chart_event.get("selection", {})
+        points = selection_data.get("points", [])
+        if points:
+            mes_seleccionado = points[0].get("x")
+            if mes_seleccionado and mes_seleccionado in df['MES_AÑO'].unique():
+                st.session_state.drilldown_mes = mes_seleccionado
                 st.rerun()
 
     max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
     max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
     st.markdown(f"""
     <div class="chart-insight">
-        💡 <b>Diagnóstico del Periodo Analizado:</b><br>
+        💡 <b>Diagnóstico del Periodo Analizado ({label_actual}):</b><br>
         • <b>Pico de Abastecimiento:</b> El mayor volumen se registró en <b>{max_vol_row[col_actual]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs).<br>
         • <b>Máximo Precio Ponderado:</b> El precio promedio más alto fue de <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b> en <b>{max_p_row[col_actual]}</b>.
     </div>

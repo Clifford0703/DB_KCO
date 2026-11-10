@@ -15,10 +15,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- PALETA CORPORATIVA ---
+# --- PALETA CORPORATIVA LUMINOSA ---
 COLOR_PRIMARY = "#1b4332"
-COLOR_SECONDARY = "#2d6a4f"
-COLOR_ACCENT = "#d97706"
+COLOR_BARRA_CLARA = "#52b788"      # Verde menta/esmeralda luminoso para barras visibles
+COLOR_BARRA_BORDE = "#2d6a4f"      # Contorno nítido para que no se pierda
+COLOR_ACCENT = "#d97706"           # Línea de precio en ámbar vibrante
 COLOR_NEUTRAL = "#0f172a"
 COLOR_INFO = "#0284c7"
 COLOR_MERCADO = "#64748b"
@@ -45,7 +46,6 @@ st.markdown(f"""
         padding-right: 1.2rem !important;
     }}
     
-    /* TÍTULO PRINCIPAL */
     .dashboard-title {{
         font-size: clamp(1.3rem, 2.8vw, 2.2rem) !important;
         font-weight: 800;
@@ -176,7 +176,7 @@ st.markdown(f"""
         color: #ffffff !important;
     }}
 
-    /* MEDIA QUERIES: VISTA VERTICAL EN CELULAR */
+    /* MEDIA QUERIES PARA CELULAR */
     @media (max-width: 768px) and (orientation: portrait) {{
         .block-container {{
             padding-top: 3.2rem !important;
@@ -190,9 +190,7 @@ st.markdown(f"""
         .kpi-grid > div:nth-child(5) {{
             grid-column: span 2;
         }}
-        .metric-card {{
-            padding: 10px 12px;
-        }}
+        .metric-card {{ padding: 10px 12px; }}
         .metric-title {{ font-size: 9.5px; }}
         .metric-value {{ font-size: 17px; }}
         .metric-sub {{ font-size: 10px; }}
@@ -203,7 +201,6 @@ st.markdown(f"""
         }}
     }}
 
-    /* MEDIA QUERIES: VISTA HORIZONTAL EN CELULAR */
     @media (max-width: 950px) and (orientation: landscape) {{
         .block-container {{
             padding-top: 3.2rem !important;
@@ -214,9 +211,7 @@ st.markdown(f"""
             grid-template-columns: repeat(5, 1fr) !important;
             gap: 6px !important;
         }}
-        .metric-card {{
-            padding: 8px 10px;
-        }}
+        .metric-card {{ padding: 8px 10px; }}
         .metric-value {{ font-size: 15px; }}
         .metric-title, .metric-sub {{ font-size: 9px; }}
     }}
@@ -306,7 +301,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR: FILTROS Y SEGMENTACIONES (DASHBOARD TRADICIONAL) ---
+# --- SIDEBAR: FILTROS LATERALES ---
 with st.sidebar:
     st.markdown("### 🎛️ Filtros & Segmentación")
     st.markdown("---")
@@ -361,7 +356,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# BOTÓN DE PANTALLA COMPLETA DEBAJO DEL TÍTULO
+# BOTÓN DE PANTALLA COMPLETA
 components.html("""
     <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 4px;">
         <button id="fs-btn" onclick="toggleFullScreen()" style="
@@ -459,28 +454,33 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
-    # 1. GRÁFICO A TODO EL ANCHO: Evolución Mensual Volumen vs Precio Ponderado
+    # 1. GRÁFICO A TODO EL ANCHO CON BARRAS CLARAS Y ESTACIONES DEL AÑO
     st.subheader(f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)")
     fig_dual = go.Figure()
 
+    # Barras de Volumen con color verde esmeralda claro y borde contrastado
     fig_dual.add_trace(go.Bar(
         x=df_trend[col_periodo],
         y=df_trend['TN_TOTALES'],
         name='Volumen (Tn)',
-        marker_color=COLOR_SECONDARY,
+        marker=dict(
+            color=COLOR_BARRA_CLARA,
+            line=dict(color=COLOR_BARRA_BORDE, width=1.5)
+        ),
         text=df_trend['TN_TOTALES'].apply(lambda x: f"{x:,.1f} Tn"),
         textposition='outside',
-        outsidetextfont=dict(color='#0f172a', size=11, family="Arial", weight="bold"),
+        outsidetextfont=dict(color='#0f172a', size=11.5, family="Arial", weight="bold"),
         hovertemplate=(
             f"<b>{label_periodo}: %{{x}}</b><br>" +
-            "📦 Volumen: %{y:.2f} Tn (%{customdata[0]:,.0f} kg)<br>" +
+            "📦 Volumen Solicitado: <b>%{y:.2f} Tn</b> (%{customdata[0]:,.0f} kg)<br>" +
             "📋 Órdenes de Compra: %{customdata[1]:,}<br>" +
-            "💰 Venta: S/ %{customdata[2]:,.2f}<extra></extra>"
+            "💰 Facturación: S/ %{customdata[2]:,.2f}<extra></extra>"
         ),
         customdata=np.stack((df_trend['KG_TOTALES'], df_trend['ORDENES'], df_trend['VALOR_TOTAL']), axis=-1),
         yaxis='y'
     ))
 
+    # Línea de Precio Ponderado
     fig_dual.add_trace(go.Scatter(
         x=df_trend[col_periodo],
         y=df_trend['PRECIO_POND'],
@@ -488,15 +488,35 @@ if vista_activa == "📊 Resumen & Evolución":
         mode='lines+markers+text',
         text=df_trend['PRECIO_POND'].apply(lambda x: f"S/{x:.2f}"),
         textposition='top center',
-        textfont=dict(color='#b45309', size=11, family="Arial", weight="bold"),
-        marker=dict(size=8, color=COLOR_ACCENT),
-        line=dict(width=3, color=COLOR_ACCENT),
+        textfont=dict(color='#b45309', size=11.5, family="Arial", weight="bold"),
+        marker=dict(size=9, color=COLOR_ACCENT),
+        line=dict(width=3.2, color=COLOR_ACCENT),
         hovertemplate=(
             f"<b>{label_periodo}: %{{x}}</b><br>" +
             "🏷️ <b>Precio Ponderado: S/ %{y:.2f} /kg</b><extra></extra>"
         ),
         yaxis='y2'
     ))
+
+    # INCORPORACIÓN DE ESTACIONES DEL AÑO Y VENTANA DE ALTA DEMANDA (Si la agrupación es mensual)
+    if periodo_seleccionado == "Mensual":
+        lista_meses = df_trend[col_periodo].tolist()
+        
+        # Sombreado de la Ventana de Mayor Demanda / Cosecha Alta de Palta Fuerte (Mayo a Setiembre)
+        meses_temporada = [m for m in lista_meses if any(m.endswith(f"-{str(x).zfill(2)}") for x in range(5, 10))]
+        if meses_temporada:
+            fig_dual.add_vrect(
+                x0=meses_temporada[0],
+                x1=meses_temporada[-1],
+                fillcolor="rgba(34, 197, 94, 0.12)",
+                layer="below",
+                line_width=1,
+                line_dash="dot",
+                line_color="rgba(22, 163, 74, 0.4)",
+                annotation_text="🔥 Temporada Alta & Mayor Demanda (May - Set)",
+                annotation_position="top left",
+                annotation_font=dict(size=11, color="#15803d", weight="bold")
+            )
 
     fig_dual.update_layout(
         autosize=True,
@@ -505,8 +525,8 @@ if vista_activa == "📊 Resumen & Evolución":
         yaxis2=dict(title='Precio Pond. (S/ /kg)', overlaying='y', side='right', showgrid=True),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         template='plotly_white',
-        height=430,
-        margin=dict(t=35, b=25, l=10, r=10)
+        height=450,
+        margin=dict(t=45, b=25, l=10, r=10)
     )
     st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG)
     
@@ -514,9 +534,9 @@ if vista_activa == "📊 Resumen & Evolución":
     max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
     st.markdown(f"""
     <div class="chart-insight">
-        💡 <b>Insight Comercial ({periodo_seleccionado}):</b> 
-        El pico de volumen se registró en <b>{max_vol_row[col_periodo]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs). 
-        El mayor precio ponderado se alcanzó en <b>{max_p_row[col_periodo]}</b> a <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b>.
+        💡 <b>Diagnóstico de Estacionalidad & Ventas:</b><br>
+        • <b>Comportamiento en Temporada Alta (Mayo - Setiembre):</b> La franja verde resalta la ventana estacional donde el mercado mayorista recibe los mayores volúmenes y la demanda retail se acelera. Tus despachos alcanzaron su pico absoluto en <b>{max_vol_row[col_periodo]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs), demostrando que tu abastecimiento estuvo <b>100% alineado a la temporada de alta demanda</b>.<br>
+        • <b>Comportamiento en Temporada Baja (Octubre - Noviembre):</b> La oferta mayorista se contrae y el precio ponderado de venta trepó a su máximo de <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b> en <b>{max_p_row[col_periodo]}</b>.
     </div>
     """, unsafe_allow_html=True)
 
@@ -660,6 +680,12 @@ else:
                 text_kco_intercalado.append("")
 
         fig_anual = go.Figure()
+
+        # Bandas de Estaciones del Año en el fondo (Shading sutil)
+        fig_anual.add_vrect(x0='Ene', x1='Mar', fillcolor="rgba(254, 240, 138, 0.15)", layer="below", line_width=0, annotation_text="☀️ Verano", annotation_position="top left", annotation_font=dict(size=10, color="#854d0e"))
+        fig_anual.add_vrect(x0='Abr', x1='Jun', fillcolor="rgba(254, 215, 170, 0.15)", layer="below", line_width=0, annotation_text="🍂 Otoño", annotation_position="top left", annotation_font=dict(size=10, color="#9a3412"))
+        fig_anual.add_vrect(x0='Jul', x1='Set', fillcolor="rgba(224, 242, 254, 0.25)", layer="below", line_width=0, annotation_text="❄️ Invierno", annotation_position="top left", annotation_font=dict(size=10, color="#0369a1"))
+        fig_anual.add_vrect(x0='Oct', x1='Dic', fillcolor="rgba(220, 252, 231, 0.20)", layer="below", line_width=0, annotation_text="🌸 Primavera", annotation_position="top left", annotation_font=dict(size=10, color="#15803d"))
 
         # A. Mercado Mayorista 2025
         fig_anual.add_trace(go.Scatter(

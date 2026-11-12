@@ -57,6 +57,28 @@ st.markdown(f"""
         padding-right: 0.8rem !important;
     }}
 
+    /* COMPACTAR Y SUBIR EL PANEL DE SEGMENTACIÓN (SIDEBAR) */
+    section[data-testid="stSidebar"] > div:first-child {{
+        padding-top: 0.4rem !important;
+    }}
+    div[data-testid="stSidebarHeader"] {{
+        height: 1.8rem !important;
+        padding: 0.2rem 0.6rem !important;
+        margin-bottom: -0.6rem !important;
+    }}
+    section[data-testid="stSidebarUserContent"] {{
+        padding-top: 0rem !important;
+        padding-bottom: 0.5rem !important;
+    }}
+    section[data-testid="stSidebar"] h3 {{
+        margin-top: 0px !important;
+        padding-top: 0px !important;
+        margin-bottom: 0.3rem !important;
+    }}
+    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
+        gap: 0.35rem !important;
+    }}
+
     /* BARRA SUPERIOR CON MARGEN DE SEGURIDAD */
     .header-bar {{
         display: flex;
@@ -271,7 +293,6 @@ st.markdown(f"""
         padding: 5px 11px;
         border-radius: 6px;
     }}
-    /* Compactar interlineado interno de los popovers (Checkboxes y botones de acción) */
     div[data-testid="stPopoverBody"] {{
         padding: 8px 10px !important;
         min-width: 215px !important;
@@ -288,7 +309,6 @@ st.markdown(f"""
         font-size: 12px !important;
         line-height: 1.2 !important;
     }}
-    /* Botón de borrador ultra compacto estilo Power BI */
     div[data-testid="stPopoverBody"] button {{
         padding: 2px 7px !important;
         min-height: 24px !important;
@@ -411,7 +431,7 @@ with st.sidebar:
     meses_disp = sorted(df_año['MES_NUM'].dropna().astype(int).unique().tolist())
     
     if 'sel_meses' not in st.session_state or st.session_state.get('last_year') != año_seleccionado:
-        st.session_state.sel_meses = []  # Vacío por defecto -> Muestra todo
+        st.session_state.sel_meses = []
         st.session_state.last_year = año_seleccionado
 
     st.markdown("**🗓️ Meses**")
@@ -440,14 +460,13 @@ with st.sidebar:
                 nuevos_meses.append(m)
         st.session_state.sel_meses = nuevos_meses
 
-    # Si está vacío, no filtra (muestra todos los meses); si hay selección, filtra solo esos
     selected_meses = st.session_state.sel_meses if len(st.session_state.sel_meses) > 0 else meses_disp
 
     # 3. SLICER DE VARIEDAD / CALIBRE (POR DEFECTO DESELECCIONADO = MUESTRA TODO)
     prods_reales = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
     
     if 'sel_prods' not in st.session_state:
-        st.session_state.sel_prods = []  # Vacío por defecto -> Muestra todo
+        st.session_state.sel_prods = []
 
     st.markdown("**🏷️ Variedad / Calibre**")
     n_prods_sel = len(st.session_state.sel_prods)
@@ -475,7 +494,6 @@ with st.sidebar:
                 nuevos_prods.append(p)
         st.session_state.sel_prods = nuevos_prods
 
-    # Si está vacío, muestra todas las variedades; si hay selección, filtra solo las marcadas
     selected_prods = st.session_state.sel_prods if len(st.session_state.sel_prods) > 0 else prods_reales
 
     # 4. FILTRO TIPO CALENDARIO
@@ -501,7 +519,6 @@ with st.sidebar:
         options=["Mensual", "Semanal"],
         horizontal=True
     )
-    st.divider()
     st.caption(f"KCO Group — Año Fiscal {año_seleccionado}")
 
 col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'

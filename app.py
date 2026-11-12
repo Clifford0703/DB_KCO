@@ -17,9 +17,9 @@ st.set_page_config(
 
 # --- PALETA CORPORATIVA PREMIUM ---
 COLOR_PRIMARY = "#0f3a28"
-COLOR_BARRA_CLARA = "#34d399"       # Verde esmeralda vivo
+COLOR_BARRA_CLARA = "#34d399"
 COLOR_BARRA_BORDE = "#059669"
-COLOR_ACCENT = "#f59e0b"            # Ámbar dorado cálido
+COLOR_ACCENT = "#f59e0b"
 COLOR_NEUTRAL = "#0f172a"
 COLOR_INFO = "#2563eb"
 COLOR_MERCADO = "#64748b"
@@ -32,10 +32,15 @@ VARIEDAD_COLORS = {
     'PALTA-M-KG':        '#10b981'
 }
 
+MESES_DICT = {
+    1: '01 - Enero', 2: '02 - Febrero', 3: '03 - Marzo', 4: '04 - Abril',
+    5: '05 - Mayo', 6: '06 - Junio', 7: '07 - Julio', 8: '08 - Agosto',
+    9: '09 - Setiembre', 10: '10 - Octubre', 11: '11 - Noviembre', 12: '12 - Diciembre'
+}
+
 # --- ESTILOS CSS UI/UX PREMIUM ---
 st.markdown(f"""
     <style>
-    /* Ocultar barra superior nativa vacía */
     header[data-testid="stHeader"] {{
         background: transparent !important;
         height: 0px !important;
@@ -253,6 +258,18 @@ st.markdown(f"""
     div[data-testid="stRadio"] > div > label[data-checked="true"] p {{
         color: #ffffff !important;
     }}
+
+    /* ESTILO COMPACTO PARA POPOVERS EN SIDEBAR */
+    section[data-testid="stSidebar"] button[data-testid="stPopoverButton"] {{
+        width: 100%;
+        justify-content: space-between;
+        background-color: #ffffff;
+        border: 1px solid #cbd5e1;
+        font-weight: 600;
+        font-size: 12.5px;
+        color: #1e293b;
+        padding: 6px 12px;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -300,6 +317,8 @@ def load_all_data():
             
     df = df.loc[:, ~df.columns.duplicated()]
     df['FECHA_EMISION'] = pd.to_datetime(df['FECHA_EMISION'], format='%d-%m-%Y', errors='coerce')
+    df['AÑO'] = df['FECHA_EMISION'].dt.year
+    df['MES_NUM'] = df['FECHA_EMISION'].dt.month
     df['MES_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-%m')
     df['SEMANA_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-W%V')
     
@@ -343,57 +362,146 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR (FILTROS OPTIMIZADOS) ---
+# --- SIDEBAR: SEGMENTACIÓN COMPACTA TIPO POWER BI ---
 with st.sidebar:
     st.markdown("### 🥑 Panel de Segmentación")
     
-    min_date = df_raw['FECHA_EMISION'].min().date()
-    max_date = df_raw['FECHA_EMISION'].max().date()
-    
-    # Checkbox para alternar entre todo el histórico o personalizar fechas
-    ver_todo_rango = st.checkbox("📅 Ver todo el rango disponible", value=True)
-    
-    if ver_todo_rango:
-        date_range = (min_date, max_date)
-        st.caption(f"Mostrando desde el **{min_date.strftime('%d/%m/%Y')}** hasta el **{max_date.strftime('%d/%m/%Y')}**")
-    else:
-        date_range = st.date_input(
-            "Periodo personalizado",
-            value=(min_date, max_date),
-            min_value=min_date,
-            max_value=max_date
-        )
-    
-    # Lista limpia de productos sin opción redundante: solo las variedades reales
-    prods_reales = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
-    
-    selected_prods = st.multiselect(
-        "🏷️ Variedad / Calibre",
-        options=prods_reales,
-        default=prods_reales,
-        help="Usa 'Select all' para seleccionarlas todas rápidamente o elige las deseadas."
+    # 1. FILTRO DE AÑO (SIEMPRE 1 AÑO SELECCIONADO)
+    años_disponibles = sorted(df_raw['AÑO'].dropna().astype(int).unique().tolist(), reverse=True)
+    año_seleccionado = st.selectbox(
+        "📆 Año Fiscal",
+        options=años_disponibles,
+        index=0
     )
     
+    df_año = df_raw[df_raw['AÑO'] == año_seleccionado]
+    
+    # 2. FILTRO DESPLEGABLE DE MESES (SLICER COMPACTO CON SELECT ALL)
+    meses_disp = sorted(df_año['MES_NUM'].dropna().astype(int).unique().tolist())
+    
+    # Inicializar estado de selección de meses
+    if 'sel_meses' not in st.session_state or st.session_state.get('last_year') != año_seleccionado:
+        st.session_state.sel_meses = meses_disp.copy()
+        st.session_state.last_year = año_seleccionado
+
+    st.markdown("**🗓️ Meses**")
+    n_meses_sel = len(st.session_state.sel_meses)
+    label_meses = "Todos los meses" if n_meses_sel == len(meses_disp) else (
+        f"{n_meses_sel} mes(es) sel." if n_meses_sel > 0 else "Ninguno seleccionado"
+    )
+    
+    with st.popover(label_meses, use_container_width=True):
+        c_m1, c_m2 = st.columns(2)
+        if c_m1.button("Select All", key="btn_all_meses", use_container_width=True):
+            st.session_state.sel_meses = meses_disp.copy()
+            for m in meses_disp:
+                st.session_state[f"chk_mes_{m}"] = True
+            st.rerun()
+        if c_m2.button("Limpiar", key="btn_none_meses", use_container_width=True):
+            st.session_state.sel_meses = []
+            for m in meses_disp:
+                st.session_state[f"chk_mes_{m}"] = False
+            st.rerun()
+        st.divider()
+        nuevos_meses = []
+        for m in meses_disp:
+            checked = st.checkbox(
+                MESES_DICT.get(m, f"Mes {m}"),
+                value=(m in st.session_state.sel_meses),
+                key=f"chk_mes_{m}"
+            )
+            if checked:
+                nuevos_meses.append(m)
+        st.session_state.sel_meses = nuevos_meses
+
+    selected_meses = st.session_state.sel_meses
+
+    # 3. FILTRO DESPLEGABLE DE VARIEDAD / CALIBRE (SLICER COMPACTO CON SELECT ALL)
+    prods_reales = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
+    
+    if 'sel_prods' not in st.session_state:
+        st.session_state.sel_prods = prods_reales.copy()
+
+    st.markdown("**🏷️ Variedad / Calibre**")
+    n_prods_sel = len(st.session_state.sel_prods)
+    label_prods = "Todas las variedades" if n_prods_sel == len(prods_reales) else (
+        st.session_state.sel_prods[0] if n_prods_sel == 1 else (
+            f"{n_prods_sel} variedades sel." if n_prods_sel > 1 else "Ninguna seleccionada"
+        )
+    )
+    
+    with st.popover(label_prods, use_container_width=True):
+        c_p1, c_p2 = st.columns(2)
+        if c_p1.button("Select All", key="btn_all_prods", use_container_width=True):
+            st.session_state.sel_prods = prods_reales.copy()
+            for p in prods_reales:
+                st.session_state[f"chk_prod_{p}"] = True
+            st.rerun()
+        if c_p2.button("Limpiar", key="btn_none_prods", use_container_width=True):
+            st.session_state.sel_prods = []
+            for p in prods_reales:
+                st.session_state[f"chk_prod_{p}"] = False
+            st.rerun()
+        st.divider()
+        nuevos_prods = []
+        for p in prods_reales:
+            checked = st.checkbox(
+                p,
+                value=(p in st.session_state.sel_prods),
+                key=f"chk_prod_{p}"
+            )
+            if checked:
+                nuevos_prods.append(p)
+        st.session_state.sel_prods = nuevos_prods
+
+    selected_prods = st.session_state.sel_prods
+
+    # 4. FILTRO TIPO CALENDARIO (ACOTADO AL AÑO SELECCIONADO)
+    st.markdown("**📅 Rango de Fechas (Calendario)**")
+    min_date_año = df_año['FECHA_EMISION'].min().date()
+    max_date_año = df_año['FECHA_EMISION'].max().date()
+    
+    ver_todo_rango = st.checkbox("Todo el rango del año", value=True)
+    if ver_todo_rango:
+        date_range = (min_date_año, max_date_año)
+    else:
+        date_range = st.date_input(
+            "Seleccionar fechas",
+            value=(min_date_año, max_date_año),
+            min_value=min_date_año,
+            max_value=max_date_año,
+            label_visibility="collapsed"
+        )
+    
+    # 5. AGRUPACIÓN TEMPORAL BASE
     periodo_seleccionado = st.radio(
         "⏱️ Agrupación Base",
         options=["Mensual", "Semanal"],
         horizontal=True
     )
     st.divider()
-    st.caption("KCO Group — Intelligence & Pricing")
+    st.caption(f"KCO Group — Año Fiscal {año_seleccionado}")
 
 col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
 label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
 
-# Filtrado de DataFrame
-df = df_raw.copy()
-if len(date_range) == 2:
-    df = df[(df['FECHA_EMISION'].dt.date >= date_range[0]) & (df['FECHA_EMISION'].dt.date <= date_range[1])]
+# --- APLICACIÓN DE FILTROS ---
+df = df_año.copy()
+if selected_meses:
+    df = df[df['MES_NUM'].isin(selected_meses)]
+else:
+    df = df.iloc[0:0]
+
 if selected_prods:
     df = df[df['DESCRIPCION_PRODUCTO'].isin(selected_prods)]
+else:
+    df = df.iloc[0:0]
+
+if len(date_range) == 2:
+    df = df[(df['FECHA_EMISION'].dt.date >= date_range[0]) & (df['FECHA_EMISION'].dt.date <= date_range[1])]
 
 if df.empty:
-    st.warning("⚠️ No se encontraron órdenes para la combinación seleccionada.")
+    st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
     st.stop()
 
 if periodo_seleccionado == "Semanal":
@@ -403,7 +511,7 @@ if periodo_seleccionado == "Semanal":
 st.markdown(f"""
     <div class="header-bar">
         <div class="header-title">
-            🥑 KCO Group | Intelligence & Pricing Dashboard
+            🥑 KCO Group | Intelligence & Pricing Dashboard ({año_seleccionado})
         </div>
         <div class="header-meta">
             <b>Desarrollado por:</b> Alfredo Huaracha Mendoza &nbsp;|&nbsp; <i>Operations BI</i><br>
@@ -540,7 +648,7 @@ if vista_activa == "📊 Resumen & Evolución":
         df_target = df.copy()
         col_actual = col_periodo
         label_actual = label_periodo
-        titulo_grafico = f"Evolución {periodo_seleccionado}: Volumen (Tn) vs Precio Ponderado (S/)"
+        titulo_grafico = f"Evolución {periodo_seleccionado} ({año_seleccionado}): Volumen (Tn) vs Precio Ponderado (S/)"
 
     df_trend = df_target.groupby(col_actual).agg(
         KG_TOTALES=('KILOS_SOLICITADOS', 'sum'),
@@ -681,11 +789,12 @@ if vista_activa == "📊 Resumen & Evolución":
     # INSIGHT 1: EVOLUCIÓN
     max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
     max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
+    var_p_txt = f"({max_p_row['VAR_PRECIO_PCT']:+.1f}% vs periodo previo)" if pd.notna(max_p_row['VAR_PRECIO_PCT']) else ""
     st.markdown(f"""
         <div class="chart-insight">
             <div class="insight-title">💡 Diagnóstico Operativo & Estacionalidad ({label_actual}):</div>
             • <b>Pico de Abastecimiento:</b> El mayor volumen se concentró en <b>{max_vol_row[col_actual]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs despachadas), alineándose al ciclo de alta demanda de cosecha.<br>
-            • <b>Presión de Precios:</b> La cotización ponderada más elevada se registró en <b>{max_p_row[col_actual]}</b> alcanzando <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b> (+{max_p_row['VAR_PRECIO_PCT']:+.1f}% vs periodo previo), coincidiendo con la contracción de oferta mayorista.
+            • <b>Presión de Precios:</b> La cotización ponderada más elevada se registró en <b>{max_p_row[col_actual]}</b> alcanzando <b>S/ {max_p_row['PRECIO_POND']:.2f} /kg</b> {var_p_txt}, coincidiendo con la contracción de oferta mayorista.
         </div>
     """, unsafe_allow_html=True)
 
@@ -726,7 +835,6 @@ if vista_activa == "📊 Resumen & Evolución":
         )
         st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
 
-        # INSIGHT 2: MIX
         top_prod = df_prod.iloc[0]
         st.markdown(f"""
             <div class="chart-insight" style="margin-top: 4px;">
@@ -755,12 +863,12 @@ if vista_activa == "📊 Resumen & Evolución":
             use_container_width=True, height=225, hide_index=True
         )
 
-        # INSIGHT 3: MATRIZ
         prom_var_precio = df_trend['VAR_PRECIO_PCT'].mean()
+        var_m_txt = f"{prom_var_precio:+.1f}%" if pd.notna(prom_var_precio) else "N/A"
         st.markdown(f"""
             <div class="chart-insight" style="margin-top: 4px;">
                 <div class="insight-title">📊 Auditoría de Desempeño:</div>
-                La volatilidad interperiódica promedio de precio fue de <b>{prom_var_precio:+.1f}%</b>. Las celdas en verde reflejan ventanas de captura de mayor margen por kilogramo despachado frente al periodo previo.
+                La volatilidad interperiódica promedio de precio fue de <b>{var_m_txt}</b>. Las celdas en verde reflejan ventanas de captura de mayor margen por kilogramo despachado frente al periodo previo.
             </div>
         """, unsafe_allow_html=True)
 
@@ -779,7 +887,7 @@ else:
         mkt_2025 = [mkt_mensual[2025].get(i, np.nan) if 2025 in mkt_mensual else np.nan for i in range(1, 13)]
         mkt_2026_real = [mkt_mensual[2026].get(i, np.nan) if 2026 in mkt_mensual else np.nan for i in range(1, 13)]
         
-        df_kco = df_raw.copy()
+        df_kco = df_raw[df_raw['AÑO'] == año_seleccionado].copy()
         df_kco['MES'] = df_kco['FECHA_EMISION'].dt.month
         kco_mensual = df_kco.groupby('MES').agg(
             KILOS=('KILOS_SOLICITADOS', 'sum'),
@@ -857,7 +965,6 @@ else:
         with c_p3:
             st.markdown(f'<div class="kpi-card kpi-precio"><div class="kpi-title">KCO Sugerido (Dic Proy)</div><div class="kpi-value" style="font-size:16px;">S/ {kco_dic_pred:.2f} /kg</div><div class="kpi-sub">Rango: S/ {kco_dic_pred - 0.30:.2f} - S/ {kco_dic_pred + 0.30:.2f}</div></div>', unsafe_allow_html=True)
 
-        # INSIGHT 4: PRICING BENCHMARK
         st.markdown(f"""
             <div class="chart-insight">
                 <div class="insight-title">💡 Estrategia de Pricing Proyectada (Diciembre):</div>
@@ -885,7 +992,6 @@ else:
             fig_banda.update_layout(autosize=True, template='plotly_white', height=205, showlegend=False, yaxis=dict(title='Precio S/ /kg', titlefont=dict(size=8.5), tickfont=dict(size=8)), xaxis=dict(tickfont=dict(size=8)), margin=dict(t=10, b=15, l=8, r=8))
             st.plotly_chart(fig_banda, use_container_width=True, config=PLOTLY_CONFIG)
 
-            # INSIGHT 5: BANDA
             spread_max_var = (df_banda['PRECIO_MAX'] - df_banda['PRECIO_MIN']).max()
             st.markdown(f"""
                 <div class="chart-insight" style="margin-top: 4px;">
@@ -894,7 +1000,6 @@ else:
                 </div>
             """, unsafe_allow_html=True)
 
-        # Cálculo de variaciones
         df_prod_trend = df.groupby(['DESCRIPCION_PRODUCTO', col_periodo]).agg(KG=('KILOS_SOLICITADOS', 'sum'), VALOR=('VALOR_COMERCIAL', 'sum')).reset_index()
         df_prod_trend['PRECIO_POND'] = df_prod_trend['VALOR'] / df_prod_trend['KG']
         df_prod_trend = df_prod_trend.sort_values(by=['DESCRIPCION_PRODUCTO', col_periodo])
@@ -917,7 +1022,6 @@ else:
             else:
                 st.info("Sin variaciones en el periodo.")
 
-            # INSIGHT 6: HISTORIAL
             st.markdown(f"""
                 <div class="chart-insight" style="margin-top: 4px;">
                     <div class="insight-title">📈 Sensibilidad de Cotización:</div>

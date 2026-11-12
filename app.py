@@ -259,7 +259,7 @@ st.markdown(f"""
         color: #ffffff !important;
     }}
 
-    /* ESTILO COMPACTO PARA POPOVERS EN SIDEBAR */
+    /* ESTILO SLICER POWER BI EN SIDEBAR Y POPOVERS */
     section[data-testid="stSidebar"] button[data-testid="stPopoverButton"] {{
         width: 100%;
         justify-content: space-between;
@@ -268,7 +268,38 @@ st.markdown(f"""
         font-weight: 600;
         font-size: 12.5px;
         color: #1e293b;
-        padding: 6px 12px;
+        padding: 5px 11px;
+        border-radius: 6px;
+    }}
+    /* Compactar interlineado interno de los popovers (Checkboxes y botones de acción) */
+    div[data-testid="stPopoverBody"] {{
+        padding: 8px 10px !important;
+        min-width: 215px !important;
+    }}
+    div[data-testid="stPopoverBody"] div[data-testid="stVerticalBlock"] {{
+        gap: 0.15rem !important;
+    }}
+    div[data-testid="stPopoverBody"] label[data-testid="stCheckbox"] {{
+        padding-top: 1px !important;
+        padding-bottom: 1px !important;
+        min-height: 22px !important;
+    }}
+    div[data-testid="stPopoverBody"] label[data-testid="stCheckbox"] p {{
+        font-size: 12px !important;
+        line-height: 1.2 !important;
+    }}
+    /* Botón de borrador ultra compacto estilo Power BI */
+    div[data-testid="stPopoverBody"] button {{
+        padding: 2px 7px !important;
+        min-height: 24px !important;
+        height: 24px !important;
+        font-size: 11.5px !important;
+        border-radius: 4px !important;
+        border: 1px solid #e2e8f0 !important;
+        background-color: #f8fafc !important;
+    }}
+    div[data-testid="stPopoverBody"] button:hover {{
+        background-color: #e2e8f0 !important;
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -362,7 +393,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR: SEGMENTACIÓN COMPACTA TIPO POWER BI ---
+# --- SIDEBAR: SLICERS ESTILO POWER BI ---
 with st.sidebar:
     st.markdown("### 🥑 Panel de Segmentación")
     
@@ -376,33 +407,28 @@ with st.sidebar:
     
     df_año = df_raw[df_raw['AÑO'] == año_seleccionado]
     
-    # 2. FILTRO DESPLEGABLE DE MESES (SLICER COMPACTO CON SELECT ALL)
+    # 2. SLICER DE MESES (POR DEFECTO DESELECCIONADO = MUESTRA TODO)
     meses_disp = sorted(df_año['MES_NUM'].dropna().astype(int).unique().tolist())
     
-    # Inicializar estado de selección de meses
     if 'sel_meses' not in st.session_state or st.session_state.get('last_year') != año_seleccionado:
-        st.session_state.sel_meses = meses_disp.copy()
+        st.session_state.sel_meses = []  # Vacío por defecto -> Muestra todo
         st.session_state.last_year = año_seleccionado
 
     st.markdown("**🗓️ Meses**")
     n_meses_sel = len(st.session_state.sel_meses)
-    label_meses = "Todos los meses" if n_meses_sel == len(meses_disp) else (
-        f"{n_meses_sel} mes(es) sel." if n_meses_sel > 0 else "Ninguno seleccionado"
+    label_meses = "Todos (Sin filtro)" if n_meses_sel == 0 else (
+        MESES_DICT.get(st.session_state.sel_meses[0], "") if n_meses_sel == 1 else f"{n_meses_sel} meses sel."
     )
     
     with st.popover(label_meses, use_container_width=True):
-        c_m1, c_m2 = st.columns(2)
-        if c_m1.button("Select All", key="btn_all_meses", use_container_width=True):
-            st.session_state.sel_meses = meses_disp.copy()
-            for m in meses_disp:
-                st.session_state[f"chk_mes_{m}"] = True
-            st.rerun()
-        if c_m2.button("Limpiar", key="btn_none_meses", use_container_width=True):
+        h_m1, h_m2 = st.columns([4, 1.3])
+        h_m1.markdown("<span style='font-size:11px; font-weight:700; color:#64748b;'>Seleccionar mes</span>", unsafe_allow_html=True)
+        if h_m2.button("🧹", key="btn_clr_meses", help="Borrar selección (Mostrar todos)"):
             st.session_state.sel_meses = []
             for m in meses_disp:
                 st.session_state[f"chk_mes_{m}"] = False
             st.rerun()
-        st.divider()
+            
         nuevos_meses = []
         for m in meses_disp:
             checked = st.checkbox(
@@ -414,35 +440,30 @@ with st.sidebar:
                 nuevos_meses.append(m)
         st.session_state.sel_meses = nuevos_meses
 
-    selected_meses = st.session_state.sel_meses
+    # Si está vacío, no filtra (muestra todos los meses); si hay selección, filtra solo esos
+    selected_meses = st.session_state.sel_meses if len(st.session_state.sel_meses) > 0 else meses_disp
 
-    # 3. FILTRO DESPLEGABLE DE VARIEDAD / CALIBRE (SLICER COMPACTO CON SELECT ALL)
+    # 3. SLICER DE VARIEDAD / CALIBRE (POR DEFECTO DESELECCIONADO = MUESTRA TODO)
     prods_reales = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
     
     if 'sel_prods' not in st.session_state:
-        st.session_state.sel_prods = prods_reales.copy()
+        st.session_state.sel_prods = []  # Vacío por defecto -> Muestra todo
 
     st.markdown("**🏷️ Variedad / Calibre**")
     n_prods_sel = len(st.session_state.sel_prods)
-    label_prods = "Todas las variedades" if n_prods_sel == len(prods_reales) else (
-        st.session_state.sel_prods[0] if n_prods_sel == 1 else (
-            f"{n_prods_sel} variedades sel." if n_prods_sel > 1 else "Ninguna seleccionada"
-        )
+    label_prods = "Todas (Sin filtro)" if n_prods_sel == 0 else (
+        st.session_state.sel_prods[0] if n_prods_sel == 1 else f"{n_prods_sel} variedades sel."
     )
     
     with st.popover(label_prods, use_container_width=True):
-        c_p1, c_p2 = st.columns(2)
-        if c_p1.button("Select All", key="btn_all_prods", use_container_width=True):
-            st.session_state.sel_prods = prods_reales.copy()
-            for p in prods_reales:
-                st.session_state[f"chk_prod_{p}"] = True
-            st.rerun()
-        if c_p2.button("Limpiar", key="btn_none_prods", use_container_width=True):
+        h_p1, h_p2 = st.columns([4, 1.3])
+        h_p1.markdown("<span style='font-size:11px; font-weight:700; color:#64748b;'>Seleccionar calibre</span>", unsafe_allow_html=True)
+        if h_p2.button("🧹", key="btn_clr_prods", help="Borrar selección (Mostrar todas)"):
             st.session_state.sel_prods = []
             for p in prods_reales:
                 st.session_state[f"chk_prod_{p}"] = False
             st.rerun()
-        st.divider()
+            
         nuevos_prods = []
         for p in prods_reales:
             checked = st.checkbox(
@@ -454,9 +475,10 @@ with st.sidebar:
                 nuevos_prods.append(p)
         st.session_state.sel_prods = nuevos_prods
 
-    selected_prods = st.session_state.sel_prods
+    # Si está vacío, muestra todas las variedades; si hay selección, filtra solo las marcadas
+    selected_prods = st.session_state.sel_prods if len(st.session_state.sel_prods) > 0 else prods_reales
 
-    # 4. FILTRO TIPO CALENDARIO (ACOTADO AL AÑO SELECCIONADO)
+    # 4. FILTRO TIPO CALENDARIO
     st.markdown("**📅 Rango de Fechas (Calendario)**")
     min_date_año = df_año['FECHA_EMISION'].min().date()
     max_date_año = df_año['FECHA_EMISION'].max().date()
@@ -487,15 +509,8 @@ label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
 
 # --- APLICACIÓN DE FILTROS ---
 df = df_año.copy()
-if selected_meses:
-    df = df[df['MES_NUM'].isin(selected_meses)]
-else:
-    df = df.iloc[0:0]
-
-if selected_prods:
-    df = df[df['DESCRIPCION_PRODUCTO'].isin(selected_prods)]
-else:
-    df = df.iloc[0:0]
+df = df[df['MES_NUM'].isin(selected_meses)]
+df = df[df['DESCRIPCION_PRODUCTO'].isin(selected_prods)]
 
 if len(date_range) == 2:
     df = df[(df['FECHA_EMISION'].dt.date >= date_range[0]) & (df['FECHA_EMISION'].dt.date <= date_range[1])]

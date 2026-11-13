@@ -38,6 +38,12 @@ MESES_DICT = {
     9: '09 - Setiembre', 10: '10 - Octubre', 11: '11 - Noviembre', 12: '12 - Diciembre'
 }
 
+# Índice estacional promedio de demanda en Lima Metropolitana (2024–2026, Base Mayo = 100)
+INDICE_ESTACIONAL_LIMA = {
+    1: 47.3, 2: 64.7, 3: 86.0, 4: 96.3, 5: 100.0, 6: 91.3,
+    7: 73.3, 8: 56.7, 9: 45.3, 10: 32.3, 11: 29.3, 12: 42.7
+}
+
 # --- ESTILOS CSS UI/UX PREMIUM ---
 st.markdown(f"""
     <style>
@@ -427,7 +433,6 @@ except Exception as e:
 
 # --- SIDEBAR: NAVEGACIÓN, PANTALLA COMPLETA, SLICERS Y MODO PRIVACIDAD ---
 with st.sidebar:
-    # Fila superior: Título de panel + Botón Pantalla Completa
     sb_top1, sb_top2 = st.columns([4.2, 1])
     with sb_top1:
         st.markdown("### 🥑 Control BI")
@@ -614,7 +619,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- KPIS DE ALTO IMPACTO (CON SOPORTE DE MODO PRIVACIDAD) ---
+# --- KPIS DE ALTO IMPACTO ---
 total_kg = df['KILOS_SOLICITADOS'].sum()
 valor_comercial_total = df['VALOR_COMERCIAL'].sum()
 precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
@@ -717,9 +722,35 @@ if vista_activa == "📊 Resumen & Evolución":
         if len(df_trend) > 20:
             df_trend = df_trend.tail(20).reset_index(drop=True)
 
-    # 1. GRÁFICO SUPERIOR: EVOLUCIÓN
+    # 1. GRÁFICO SUPERIOR: EVOLUCIÓN CON ÁREA SOMBREADA SUTIL DE DEMANDA MERCADO
     st.markdown(f'<div class="chart-header">📈 {titulo_grafico}</div>', unsafe_allow_html=True)
     fig_dual = go.Figure()
+
+    # Trazado de Área Sombreada Sutil (solo en vista mensual general para comparar contra estacionalidad Lima 2024-2026)
+    tiene_ref_mercado = False
+    if es_vista_mensual and not mes_en_drilldown and len(df_trend) > 1:
+        df_trend['MES_INT'] = df_trend[col_actual].str.split('-').str[1].astype(int)
+        df_trend['INDICE_LIMA'] = df_trend['MES_INT'].map(INDICE_ESTACIONAL_LIMA)
+        
+        # Escalamos la curva estacional de Lima al volumen medio del periodo para comparar forma y ritmo sin distorsionar la escala
+        suma_indices = df_trend['INDICE_LIMA'].sum()
+        if suma_indices > 0:
+            factor_escala = df_trend['TN_TOTALES'].sum() / suma_indices
+            df_trend['DEMANDA_REF_TN'] = df_trend['INDICE_LIMA'] * factor_escala
+            tiene_ref_mercado = True
+            
+            fig_dual.add_trace(go.Scatter(
+                x=df_trend[col_actual],
+                y=df_trend['DEMANDA_REF_TN'],
+                name='Tendencia Demanda Lima (2024–2026)',
+                mode='lines',
+                line=dict(color='rgba(100, 116, 139, 0.32)', width=1.4, shape='spline'),
+                fill='tozeroy',
+                fillcolor='rgba(148, 163, 184, 0.13)',
+                hovertemplate="<b>Ref. Estacional Lima</b><br>Ritmo esperado: %{y:.1f} Tn<br>Índice Mercado: %{customdata:.0f}/100<extra></extra>",
+                customdata=df_trend['INDICE_LIMA'],
+                yaxis='y'
+            ))
 
     hover_barra = (
         f"<b>{label_actual}: %{{x}}</b><br>Volumen: %{{y:.2f}} Tn (%{{customdata[0]:,.0f}} kg)<br>Órdenes: %{{customdata[1]:,}}<extra></extra>"
@@ -730,7 +761,7 @@ if vista_activa == "📊 Resumen & Evolución":
     fig_dual.add_trace(go.Bar(
         x=df_trend[col_actual],
         y=df_trend['TN_TOTALES'],
-        name='Volumen (Tn)',
+        name='Volumen KCO (Tn)',
         marker=dict(color=COLOR_BARRA_CLARA, line=dict(color=COLOR_BARRA_BORDE, width=1.2)),
         text=df_trend['TN_TOTALES'].apply(lambda x: f"<b>{x:,.1f} Tn</b>"),
         textposition='outside',
@@ -744,12 +775,11 @@ if vista_activa == "📊 Resumen & Evolución":
     anotaciones_totales = []
     lineas_estaciones = []
 
-    # Solo dibuja la línea y etiquetas de precios si no está activo el Modo Presentación
     if not ocultar_precios:
         fig_dual.add_trace(go.Scatter(
             x=df_trend[col_actual],
             y=df_trend['PRECIO_POND'],
-            name='Precio (S/)',
+            name='Precio Pond (S/)',
             mode='lines+markers',
             marker=dict(size=7, color=COLOR_ACCENT, line=dict(color="#ffffff", width=1.2)),
             line=dict(width=2.6, color=COLOR_ACCENT),
@@ -849,10 +879,18 @@ if vista_activa == "📊 Resumen & Evolución":
             st.session_state.drilldown_mes = mes_detectado
             st.rerun()
 
-    # INSIGHT 1: EVOLUCIÓN
+    # INSIGHT 1: EVOLUCIÓN Y CONTRASTE CON ESTACIONALIDAD DE MERCADO
     max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
     max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
     var_p_txt = f"({max_p_row['VAR_PRECIO_PCT']:+.1f}% vs periodo previo)" if pd.notna(max_p_row['VAR_PRECIO_PCT']) else ""
+    
+    insight_mercado_txt = ""
+    if tiene_ref_mercado:
+        df_trend['BRECHA_ESTACIONAL'] = df_trend['TN_TOTALES'] - df_trend['DEMANDA_REF_TN']
+        mes_sobre = df_trend.loc[df_trend['BRECHA_ESTACIONAL'].idxmax()]
+        mes_bajo = df_trend.loc[df_trend['BRECHA_ESTACIONAL'].idxmin()]
+        insight_mercado_txt = f"<br>• <b>Alineación vs Demanda Lima:</b> Superas con mayor holgura el ritmo estacional en <b>{mes_sobre[col_actual]}</b> (+{mes_sobre['BRECHA_ESTACIONAL']:.1f} Tn sobre la curva referencial), mientras que la mayor oportunidad de captura de volumen está en <b>{mes_bajo[col_actual]}</b> ({mes_bajo['BRECHA_ESTACIONAL']:.1f} Tn vs tendencia)."
+
     insight_precio_linea = (
         f"• <b>Presión de Precios:</b> Información económica oculta en modo presentación."
         if ocultar_precios else
@@ -861,8 +899,8 @@ if vista_activa == "📊 Resumen & Evolución":
     st.markdown(f"""
         <div class="chart-insight">
             <div class="insight-title">💡 Diagnóstico Operativo & Estacionalidad ({label_actual}):</div>
-            • <b>Pico de Abastecimiento:</b> El mayor volumen se concentró en <b>{max_vol_row[col_actual]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs despachadas), alineándose al ciclo de alta demanda de cosecha.<br>
-            {insight_precio_linea}
+            • <b>Pico de Abastecimiento:</b> El mayor volumen se concentró en <b>{max_vol_row[col_actual]}</b> con <b>{max_vol_row['TN_TOTALES']:.1f} Tn</b> ({max_vol_row['ORDENES']} OCs despachadas).<br>
+            {insight_precio_linea}{insight_mercado_txt}
         </div>
     """, unsafe_allow_html=True)
 

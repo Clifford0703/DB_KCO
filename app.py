@@ -82,7 +82,7 @@ st.markdown(f"""
         font-size: 16px !important;
     }}
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
-        gap: 0.55rem !important;
+        gap: 0.5rem !important;
     }}
     section[data-testid="stSidebar"] hr {{
         margin: 0.35rem 0 !important;
@@ -107,8 +107,8 @@ st.markdown(f"""
         color: #334155 !important;
     }}
 
-    /* INDENTACIÓN Y ANCHO CONTROLADO DE LOS CUADROS DE VALORES */
-    section[data-testid="stSidebar"] div[data-baseweb="select"],
+    /* INDENTACIÓN Y ANCHO UNIFICADO DE TODOS LOS CUADROS DE VALORES (AÑO, MES, VARIEDAD, FECHAS) */
+    section[data-testid="stSidebar"] div[data-testid="stSelectbox"],
     section[data-testid="stSidebar"] div[data-testid="stPopover"],
     section[data-testid="stSidebar"] div[data-testid="stDateInput"],
     section[data-testid="stSidebar"] div[data-testid="stCheckbox"] {{
@@ -116,7 +116,7 @@ st.markdown(f"""
         width: calc(100% - 22px) !important;
     }}
 
-    /* REDUCIR ALTURA (SLIM) DE LOS CUADROS DE VALORES (POPOVERS Y SELECTBOX) */
+    /* REDUCIR ALTURA (SLIM) Y UNIFICAR ESTILO DE POPOVERS Y SELECTBOX (AÑO FISCAL) */
     section[data-testid="stSidebar"] button[data-testid="stPopoverButton"] {{
         width: 100% !important;
         min-height: 30px !important;
@@ -137,28 +137,34 @@ st.markdown(f"""
         line-height: 1.1 !important;
     }}
 
-    section[data-testid="stSidebar"] div[data-baseweb="select"] > div {{
+    section[data-testid="stSidebar"] div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
         min-height: 30px !important;
         height: 30px !important;
         padding-top: 0px !important;
         padding-bottom: 0px !important;
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
         border-left: 3px solid {COLOR_PRIMARY} !important;
         border-radius: 5px !important;
         font-size: 11.5px !important;
         font-weight: 600 !important;
+        color: #0f172a !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
     }}
-    section[data-testid="stSidebar"] div[data-baseweb="select"] > div > div {{
+    section[data-testid="stSidebar"] div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div {{
         padding-top: 0px !important;
         padding-bottom: 0px !important;
     }}
 
-    /* COMPACTAR CHECKBOX Y RADIO DE AGRUPACIÓN */
+    /* CHECKBOX "TODO EL RANGO DEL AÑO" EN UNA SOLA FILA */
     section[data-testid="stSidebar"] label[data-testid="stCheckbox"] {{
         min-height: 22px !important;
         padding-top: 2px !important;
     }}
     section[data-testid="stSidebar"] label[data-testid="stCheckbox"] p {{
-        font-size: 11.5px !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+        line-height: 1.2 !important;
     }}
 
     /* NAVEGACIÓN SUPERIOR Y RADIO BUTTONS EN SIDEBAR */
@@ -193,9 +199,9 @@ st.markdown(f"""
         width: calc(100% - 22px) !important;
     }}
 
-    /* BOTÓN SEMIOOCULTO PARA CENSURAR PRECIOS */
+    /* BOTÓN SEMIOOCULTO CON LETRA MÁS PEQUEÑA PARA MODO PRESENTACIÓN */
     section[data-testid="stSidebar"] div[data-testid="stToggle"] {{
-        opacity: 0.28;
+        opacity: 0.30;
         transition: opacity 0.25s ease;
         margin-top: 8px;
     }}
@@ -203,8 +209,9 @@ st.markdown(f"""
         opacity: 0.95;
     }}
     section[data-testid="stSidebar"] div[data-testid="stToggle"] p {{
-        font-size: 10.5px !important;
+        font-size: 9.5px !important;
         color: #64748b !important;
+        white-space: nowrap !important;
     }}
 
     /* COMPACTAR INTERLINEADO INTERNO DE LOS POPOVERS */
@@ -237,14 +244,14 @@ st.markdown(f"""
         background-color: #e2e8f0 !important;
     }}
 
-    /* BARRA SUPERIOR CON MARGEN DE SEGURIDAD */
+    /* BARRA SUPERIOR CON MARGEN DERECHO AMPLIADO PARA EVITAR ICONOS DE GITHUB/SHARE */
     .header-bar {{
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding: 4px 6px;
         margin-left: 36px;
-        margin-right: 170px;
+        margin-right: 265px;
         margin-bottom: 6px;
     }}
     .header-title {{
@@ -384,7 +391,7 @@ st.markdown(f"""
         font-size: 11.5px;
         color: #334155;
         margin-top: 6px;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
         line-height: 1.45;
         box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     }}
@@ -502,7 +509,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR: NAVEGACIÓN, PANTALLA COMPLETA, SLICERS SLIM INDENTADOS Y MODO PRIVACIDAD ---
+# --- SIDEBAR: NAVEGACIÓN, PANTALLA COMPLETA, SLICERS UNIFICADOS Y MODO PRIVACIDAD ---
 with st.sidebar:
     sb_top1, sb_top2 = st.columns([4.2, 1])
     with sb_top1:
@@ -553,17 +560,19 @@ with st.sidebar:
     
     st.divider()
 
-    # 1. FILTRO DE AÑO (SIEMPRE 1 AÑO SELECCIONADO)
+    # 1. FILTRO DE AÑO (MISMO FORMATO Y ALINEACIÓN QUE LAS DEMÁS SEGMENTACIONES)
     años_disponibles = sorted(df_raw['AÑO'].dropna().astype(int).unique().tolist(), reverse=True)
+    st.markdown('<span class="sb-label">📆 Año Fiscal</span>', unsafe_allow_html=True)
     año_seleccionado = st.selectbox(
-        "📆 Año Fiscal",
+        "Año Fiscal",
         options=años_disponibles,
-        index=0
+        index=0,
+        label_visibility="collapsed"
     )
     
     df_año = df_raw[df_raw['AÑO'] == año_seleccionado]
     
-    # 2. SLICER DE MESES (SLIM INDENTADO)
+    # 2. SLICER DE MESES
     meses_disp = sorted(df_año['MES_NUM'].dropna().astype(int).unique().tolist())
     
     if 'sel_meses' not in st.session_state or st.session_state.get('last_year') != año_seleccionado:
@@ -598,7 +607,7 @@ with st.sidebar:
 
     selected_meses = st.session_state.sel_meses if len(st.session_state.sel_meses) > 0 else meses_disp
 
-    # 3. SLICER DE VARIEDAD / CALIBRE (SLIM INDENTADO)
+    # 3. SLICER DE VARIEDAD / CALIBRE
     prods_reales = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
     
     if 'sel_prods' not in st.session_state:
@@ -632,7 +641,7 @@ with st.sidebar:
 
     selected_prods = st.session_state.sel_prods if len(st.session_state.sel_prods) > 0 else prods_reales
 
-    # 4. FILTRO TIPO CALENDARIO (INDENTADO)
+    # 4. FILTRO TIPO CALENDARIO
     st.markdown('<span class="sb-label">📅 Rango de Fechas</span>', unsafe_allow_html=True)
     min_date_año = df_año['FECHA_EMISION'].min().date()
     max_date_año = df_año['FECHA_EMISION'].max().date()
@@ -649,7 +658,7 @@ with st.sidebar:
             label_visibility="collapsed"
         )
     
-    # 5. AGRUPACIÓN TEMPORAL BASE (INDENTADA)
+    # 5. AGRUPACIÓN TEMPORAL BASE
     periodo_seleccionado = st.radio(
         "⏱️ Agrupación Temporal",
         options=["Mensual", "Semanal"],
@@ -677,7 +686,7 @@ if df.empty:
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
-# --- HEADER DESPEJADO ---
+# --- HEADER DESPEJADO (DESPLAZADO A LA IZQUIERDA PARA NO CHOCAR CON ICONOS DE GITHUB/SHARE) ---
 st.markdown(f"""
     <div class="header-bar">
         <div class="header-title">
@@ -789,9 +798,13 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend['VAR_PRECIO_PCT'] = df_trend['PRECIO_POND'].pct_change() * 100
     df_trend['VAR_VALOR_PCT'] = df_trend['VALOR_TOTAL'].pct_change() * 100
 
+    # Si es vista semanal general, limitar a últimas 20 semanas en gráfico y tabla de detalle
+    df_detalle_grafico = df_target.copy()
     if periodo_seleccionado == "Semanal" and not mes_en_drilldown:
         if len(df_trend) > 20:
             df_trend = df_trend.tail(20).reset_index(drop=True)
+            semanas_visibles = df_trend[col_actual].tolist()
+            df_detalle_grafico = df_detalle_grafico[df_detalle_grafico['SEMANA_AÑO'].isin(semanas_visibles)].copy()
 
     # 1. GRÁFICO SUPERIOR: EVOLUCIÓN CON ÁREA SOMBREADA SUTIL DE DEMANDA MERCADO
     st.markdown(f'<div class="chart-header">📈 {titulo_grafico}</div>', unsafe_allow_html=True)
@@ -947,6 +960,35 @@ if vista_activa == "📊 Resumen & Evolución":
         if mes_detectado and mes_detectado in df['MES_AÑO'].unique():
             st.session_state.drilldown_mes = mes_detectado
             st.rerun()
+
+    # PESTAÑA DESPLEGABLE DE DATOS FILTRADOS SEGÚN MES / SEMANA ACTIVO EN EL GRÁFICO
+    etiqueta_filtro_tabla = f"Mes {mes_en_drilldown}" if mes_en_drilldown else f"Vista {periodo_seleccionado}"
+    with st.expander(f"📋 Ver detalle de órdenes filtradas ({etiqueta_filtro_tabla} — {len(df_detalle_grafico):,} registros)"):
+        df_tabla_det = df_detalle_grafico.sort_values(by=['FECHA_EMISION', 'NRO_OC'], ascending=[False, False]).copy()
+        df_tabla_det['FECHA_STR'] = df_tabla_det['FECHA_EMISION'].dt.strftime('%d/%m/%Y')
+        
+        if ocultar_precios:
+            df_show = df_tabla_det[['FECHA_STR', 'MES_AÑO', 'SEMANA_AÑO', 'NRO_OC', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'JABAS_EST']].copy()
+            df_show.columns = ['Fecha', 'Mes', 'Semana', 'N° OC', 'Variedad / Calibre', 'Kilos (kg)', 'Jabas Est.']
+            st.dataframe(
+                df_show.style.format({
+                    'Kilos (kg)': '{:,.0f}',
+                    'Jabas Est.': '{:,.1f}'
+                }),
+                use_container_width=True, height=220, hide_index=True
+            )
+        else:
+            df_show = df_tabla_det[['FECHA_STR', 'MES_AÑO', 'SEMANA_AÑO', 'NRO_OC', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PRECIO_KG', 'VALOR_COMERCIAL', 'JABAS_EST']].copy()
+            df_show.columns = ['Fecha', 'Mes', 'Semana', 'N° OC', 'Variedad / Calibre', 'Kilos (kg)', 'Precio (S/ /kg)', 'Valor Total (S/)', 'Jabas Est.']
+            st.dataframe(
+                df_show.style.format({
+                    'Kilos (kg)': '{:,.0f}',
+                    'Precio (S/ /kg)': 'S/ {:.2f}',
+                    'Valor Total (S/)': 'S/ {:,.2f}',
+                    'Jabas Est.': '{:,.1f}'
+                }),
+                use_container_width=True, height=220, hide_index=True
+            )
 
     # INSIGHT 1: EVOLUCIÓN Y CONTRASTE CON ESTACIONALIDAD DE MERCADO
     max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]

@@ -970,7 +970,6 @@ if vista_activa == "📊 Resumen & Evolución":
                 st.session_state.semana_seleccionada = None
                 st.rerun()
     else:
-        # Vista semanal (ya sea por drill-down dentro de un mes o agrupación semanal base)
         if chart_event is not None and "selection" in chart_event:
             pts = chart_event.get("selection", {}).get("points", [])
             if pts:
@@ -995,8 +994,9 @@ if vista_activa == "📊 Resumen & Evolución":
         st.session_state.semana_seleccionada = None
         etiqueta_filtro_tabla = f"Mes {mes_en_drilldown}" if mes_en_drilldown else f"Vista {periodo_seleccionado}"
 
-    # PESTAÑA DESPLEGABLE DE DATOS FILTRADOS SEGÚN MES / SEMANA ACTIVO EN EL GRÁFICO
-    with st.expander(f"📋 Ver detalle de órdenes filtradas ({etiqueta_filtro_tabla} — {len(df_detalle_grafico):,} registros)"):
+    # PESTAÑA DESPLEGABLE CON TÍTULO FIJO PARA EVITAR QUE SE CONTRAIGA AL CAMBIAR DE SEMANA
+    with st.expander("📋 Ver detalle de órdenes filtradas", expanded=bool(sem_activa)):
+        st.caption(f"Filtro activo: **{etiqueta_filtro_tabla}** — **{len(df_detalle_grafico):,}** registros")
         df_tabla_det = df_detalle_grafico.sort_values(by=['FECHA_EMISION', 'NRO_OC'], ascending=[False, False]).copy()
         df_tabla_det['FECHA_STR'] = df_tabla_det['FECHA_EMISION'].dt.strftime('%d/%m/%Y')
         

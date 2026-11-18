@@ -107,7 +107,7 @@ st.markdown(f"""
         color: #334155 !important;
     }}
 
-    /* INDENTACIÓN Y ANCHO UNIFICADO DE TODOS LOS CUADROS DE VALORES (AÑO, MES, VARIEDAD, FECHAS) */
+    /* INDENTACIÓN Y ANCHO UNIFICADO DE TODOS LOS CUADROS DE VALORES */
     section[data-testid="stSidebar"] div[data-testid="stSelectbox"],
     section[data-testid="stSidebar"] div[data-testid="stPopover"],
     section[data-testid="stSidebar"] div[data-testid="stDateInput"],
@@ -116,7 +116,7 @@ st.markdown(f"""
         width: calc(100% - 22px) !important;
     }}
 
-    /* REDUCIR ALTURA (SLIM) Y UNIFICAR ESTILO DE POPOVERS Y SELECTBOX (AÑO FISCAL) */
+    /* REDUCIR ALTURA (SLIM) Y UNIFICAR ESTILO DE POPOVERS Y SELECTBOX */
     section[data-testid="stSidebar"] button[data-testid="stPopoverButton"] {{
         width: 100% !important;
         min-height: 30px !important;
@@ -427,6 +427,8 @@ PLOTLY_CONFIG = {
 
 if 'drilldown_mes' not in st.session_state:
     st.session_state.drilldown_mes = None
+if 'semana_seleccionada' not in st.session_state:
+    st.session_state.semana_seleccionada = None
 
 PRODUCT_WEIGHTS = {
     'PALTA-FUERTE-A-KG': 0.250,
@@ -578,6 +580,8 @@ with st.sidebar:
     if 'sel_meses' not in st.session_state or st.session_state.get('last_year') != año_seleccionado:
         st.session_state.sel_meses = []
         st.session_state.last_year = año_seleccionado
+        st.session_state.drilldown_mes = None
+        st.session_state.semana_seleccionada = None
 
     st.markdown('<span class="sb-label">🗓️ Meses</span>', unsafe_allow_html=True)
     n_meses_sel = len(st.session_state.sel_meses)
@@ -686,7 +690,7 @@ if df.empty:
 if periodo_seleccionado == "Semanal":
     st.session_state.drilldown_mes = None
 
-# --- HEADER DESPEJADO (DESPLAZADO A LA IZQUIERDA PARA NO CHOCAR CON ICONOS DE GITHUB/SHARE) ---
+# --- HEADER DESPEJADO ---
 st.markdown(f"""
     <div class="header-bar">
         <div class="header-title">
@@ -768,10 +772,11 @@ if vista_activa == "📊 Resumen & Evolución":
     if es_vista_mensual and mes_en_drilldown:
         b_c1, b_c2 = st.columns([3.5, 0.8])
         with b_c1:
-            st.markdown(f'<div class="drilldown-bar"><span>🔍 Desglose semanal activo del mes: <b>{mes_en_drilldown}</b></span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="drilldown-bar"><span>🔍 Desglose semanal activo del mes: <b>{mes_en_drilldown}</b> (Haz clic en una barra semanal para filtrar la tabla)</span></div>', unsafe_allow_html=True)
         with b_c2:
             if st.button("⬅️ Ver todos los meses", use_container_width=True, type="primary"):
                 st.session_state.drilldown_mes = None
+                st.session_state.semana_seleccionada = None
                 st.rerun()
 
     if es_vista_mensual and mes_en_drilldown:
@@ -943,26 +948,54 @@ if vista_activa == "📊 Resumen & Evolución":
 
     fig_dual.update_layout(**layout_dual)
 
-    chart_key = "grafico_mensual_click" if not mes_en_drilldown else "grafico_semanal_view"
+    chart_key = "grafico_mensual_click" if not mes_en_drilldown else f"grafico_semanal_{mes_en_drilldown}"
     chart_event = st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG, key=chart_key, on_select="rerun", selection_mode="points")
 
-    if es_vista_mensual and not mes_en_drilldown and chart_event:
-        pts = chart_event.get("selection", {}).get("points", [])
-        mes_detectado = None
-        if pts:
-            idx = pts[0].get("point_index")
-            if idx is not None and 0 <= idx < len(df_trend):
-                mes_detectado = df_trend[col_actual].iloc[idx]
-            if not mes_detectado:
-                x_val = str(pts[0].get("x", "")).strip()
-                if x_val in df_trend[col_actual].values:
-                    mes_detectado = x_val
-        if mes_detectado and mes_detectado in df['MES_AÑO'].unique():
-            st.session_state.drilldown_mes = mes_detectado
-            st.rerun()
+    # PROCESAMIENTO DE CLIC EN EL GRÁFICO (MESES PARA DRILLDOWN / SEMANAS PARA FILTRAR TABLA)
+    if es_vista_mensual and not mes_en_drilldown:
+        st.session_state.semana_seleccionada = None
+        if chart_event:
+            pts = chart_event.get("selection", {}).get("points", [])
+            mes_detectado = None
+            if pts:
+                idx = pts[0].get("point_index")
+                if idx is not None and 0 <= idx < len(df_trend):
+                    mes_detectado = df_trend[col_actual].iloc[idx]
+                if not mes_detectado:
+                    x_val = str(pts[0].get("x", "")).strip()
+                    if x_val in df_trend[col_actual].values:
+                        mes_detectado = x_val
+            if mes_detectado and mes_detectado in df['MES_AÑO'].unique():
+                st.session_state.drilldown_mes = mes_detectado
+                st.session_state.semana_seleccionada = None
+                st.rerun()
+    else:
+        # Vista semanal (ya sea por drill-down dentro de un mes o agrupación semanal base)
+        if chart_event is not None and "selection" in chart_event:
+            pts = chart_event.get("selection", {}).get("points", [])
+            if pts:
+                sem_detectada = None
+                idx = pts[0].get("point_index")
+                if idx is not None and 0 <= idx < len(df_trend):
+                    sem_detectada = df_trend[col_actual].iloc[idx]
+                if not sem_detectada:
+                    x_val = str(pts[0].get("x", "")).strip()
+                    if x_val in df_trend[col_actual].values:
+                        sem_detectada = x_val
+                st.session_state.semana_seleccionada = sem_detectada
+            else:
+                st.session_state.semana_seleccionada = None
+
+    # Validar que la semana seleccionada pertenezca al subconjunto visible
+    sem_activa = st.session_state.semana_seleccionada
+    if sem_activa and sem_activa in df_detalle_grafico['SEMANA_AÑO'].values:
+        df_detalle_grafico = df_detalle_grafico[df_detalle_grafico['SEMANA_AÑO'] == sem_activa].copy()
+        etiqueta_filtro_tabla = f"Semana {sem_activa}"
+    else:
+        st.session_state.semana_seleccionada = None
+        etiqueta_filtro_tabla = f"Mes {mes_en_drilldown}" if mes_en_drilldown else f"Vista {periodo_seleccionado}"
 
     # PESTAÑA DESPLEGABLE DE DATOS FILTRADOS SEGÚN MES / SEMANA ACTIVO EN EL GRÁFICO
-    etiqueta_filtro_tabla = f"Mes {mes_en_drilldown}" if mes_en_drilldown else f"Vista {periodo_seleccionado}"
     with st.expander(f"📋 Ver detalle de órdenes filtradas ({etiqueta_filtro_tabla} — {len(df_detalle_grafico):,} registros)"):
         df_tabla_det = df_detalle_grafico.sort_values(by=['FECHA_EMISION', 'NRO_OC'], ascending=[False, False]).copy()
         df_tabla_det['FECHA_STR'] = df_tabla_det['FECHA_EMISION'].dt.strftime('%d/%m/%Y')

@@ -63,67 +63,114 @@ st.markdown(f"""
         padding-right: 0.8rem !important;
     }}
 
-    /* COMPACTAR Y SUBIR EL PANEL DE SEGMENTACIÓN (SIDEBAR) */
+    /* --- SIDEBAR COMPACTO Y BIEN DISTRIBUIDO --- */
     section[data-testid="stSidebar"] > div:first-child {{
-        padding-top: 0.4rem !important;
+        padding-top: 0.5rem !important;
     }}
     div[data-testid="stSidebarHeader"] {{
         height: 1.8rem !important;
         padding: 0.2rem 0.6rem !important;
-        margin-bottom: -0.6rem !important;
+        margin-bottom: -0.4rem !important;
     }}
     section[data-testid="stSidebarUserContent"] {{
-        padding-top: 0rem !important;
-        padding-bottom: 0.5rem !important;
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.8rem !important;
     }}
     section[data-testid="stSidebar"] h3 {{
-        margin-top: 0px !important;
-        padding-top: 0px !important;
-        margin-bottom: 0.2rem !important;
+        margin: 0 0 0.4rem 0 !important;
+        padding: 0 !important;
+        font-size: 16px !important;
     }}
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
-        gap: 0.42rem !important;
+        gap: 0.55rem !important;
+    }}
+    section[data-testid="stSidebar"] hr {{
+        margin: 0.35rem 0 !important;
     }}
 
-    /* JERARQUÍA VISUAL E INDENTACIÓN EN EL PANEL DE SEGMENTACIÓN (SIDEBAR) */
-    section[data-testid="stSidebar"] label[data-testid="stWidgetLabel"] p,
-    section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p strong {{
+    /* TÍTULOS DE SEGMENTACIÓN */
+    .sb-label {{
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #334155;
+        margin-top: 4px;
+        margin-bottom: 3px;
+        display: block;
+    }}
+    section[data-testid="stSidebar"] label[data-testid="stWidgetLabel"] {{
+        margin-bottom: 3px !important;
+        min-height: 0px !important;
+    }}
+    section[data-testid="stSidebar"] label[data-testid="stWidgetLabel"] p {{
         font-size: 11.5px !important;
         font-weight: 700 !important;
         color: #334155 !important;
-        letter-spacing: 0.2px;
     }}
 
-    /* Indentación hacia la derecha (14px) para todos los cuadros de valores */
+    /* INDENTACIÓN Y ANCHO CONTROLADO DE LOS CUADROS DE VALORES */
     section[data-testid="stSidebar"] div[data-baseweb="select"],
     section[data-testid="stSidebar"] div[data-testid="stPopover"],
     section[data-testid="stSidebar"] div[data-testid="stDateInput"],
-    section[data-testid="stSidebar"] div[data-testid="stCheckbox"],
-    section[data-testid="stSidebar"] div[data-testid="stRadio"] > div {{
-        margin-left: 14px !important;
-        width: calc(100% - 14px) !important;
+    section[data-testid="stSidebar"] div[data-testid="stCheckbox"] {{
+        margin-left: 16px !important;
+        width: calc(100% - 22px) !important;
     }}
 
-    /* Navegación superior sin indentación extra para mantener ancho completo */
-    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div:nth-child(2) div[data-testid="stRadio"] > div {{
-        margin-left: 0px !important;
+    /* REDUCIR ALTURA (SLIM) DE LOS CUADROS DE VALORES (POPOVERS Y SELECTBOX) */
+    section[data-testid="stSidebar"] button[data-testid="stPopoverButton"] {{
         width: 100% !important;
-        background: #e2e8f0;
-        padding: 3px;
-        border-radius: 7px;
-        gap: 3px;
+        min-height: 30px !important;
+        height: 30px !important;
+        padding: 2px 10px !important;
+        justify-content: space-between !important;
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-left: 3px solid {COLOR_PRIMARY} !important;
+        font-weight: 600 !important;
+        font-size: 11.5px !important;
+        color: #0f172a !important;
+        border-radius: 5px !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+    }}
+    section[data-testid="stSidebar"] button[data-testid="stPopoverButton"] p {{
+        font-size: 11.5px !important;
+        line-height: 1.1 !important;
     }}
 
-    /* Estilo de botones de navegación y agrupación temporal en el sidebar */
+    section[data-testid="stSidebar"] div[data-baseweb="select"] > div {{
+        min-height: 30px !important;
+        height: 30px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        border-left: 3px solid {COLOR_PRIMARY} !important;
+        border-radius: 5px !important;
+        font-size: 11.5px !important;
+        font-weight: 600 !important;
+    }}
+    section[data-testid="stSidebar"] div[data-baseweb="select"] > div > div {{
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+    }}
+
+    /* COMPACTAR CHECKBOX Y RADIO DE AGRUPACIÓN */
+    section[data-testid="stSidebar"] label[data-testid="stCheckbox"] {{
+        min-height: 22px !important;
+        padding-top: 2px !important;
+    }}
+    section[data-testid="stSidebar"] label[data-testid="stCheckbox"] p {{
+        font-size: 11.5px !important;
+    }}
+
+    /* NAVEGACIÓN SUPERIOR Y RADIO BUTTONS EN SIDEBAR */
     section[data-testid="stSidebar"] div[data-testid="stRadio"] > div {{
         background: #e2e8f0;
         padding: 3px;
-        border-radius: 7px;
+        border-radius: 6px;
         gap: 3px;
     }}
     section[data-testid="stSidebar"] div[data-testid="stRadio"] > div > label {{
         background: transparent;
-        padding: 5px 8px !important;
+        padding: 4px 8px !important;
         border-radius: 5px;
         font-weight: 700;
         font-size: 11.5px !important;
@@ -134,34 +181,16 @@ st.markdown(f"""
     section[data-testid="stSidebar"] div[data-testid="stRadio"] > div > label[data-checked="true"] {{
         background: {COLOR_PRIMARY} !important;
         color: #ffffff !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.15);
     }}
     section[data-testid="stSidebar"] div[data-testid="stRadio"] > div > label[data-checked="true"] p {{
         color: #ffffff !important;
     }}
 
-    /* Acento visual en cuadros desplegables y selectbox del sidebar */
-    section[data-testid="stSidebar"] button[data-testid="stPopoverButton"] {{
-        width: 100% !important;
-        justify-content: space-between !important;
-        background-color: #ffffff !important;
-        border: 1px solid #cbd5e1 !important;
-        border-left: 3px solid {COLOR_PRIMARY} !important;
-        font-weight: 600 !important;
-        font-size: 12px !important;
-        color: #0f172a !important;
-        padding: 5px 10px !important;
-        border-radius: 6px !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
-    }}
-    section[data-testid="stSidebar"] div[data-baseweb="select"] > div {{
-        border-left: 3px solid {COLOR_PRIMARY} !important;
-        border-radius: 6px !important;
-        font-size: 12px !important;
-        font-weight: 600 !important;
-    }}
-    .sidebar-section-gap {{
-        margin-top: 5px;
+    /* Indentar únicamente el radio de "Agrupación Temporal" */
+    section[data-testid="stSidebar"] div[data-testid="stRadio"][aria-label*="Agrupación"] > div {{
+        margin-left: 16px !important;
+        width: calc(100% - 22px) !important;
     }}
 
     /* BOTÓN SEMIOOCULTO PARA CENSURAR PRECIOS */
@@ -473,7 +502,7 @@ except Exception as e:
     st.error(f"Error cargando los archivos: {e}")
     st.stop()
 
-# --- SIDEBAR: NAVEGACIÓN, PANTALLA COMPLETA, SLICERS INDENTADOS Y MODO PRIVACIDAD ---
+# --- SIDEBAR: NAVEGACIÓN, PANTALLA COMPLETA, SLICERS SLIM INDENTADOS Y MODO PRIVACIDAD ---
 with st.sidebar:
     sb_top1, sb_top2 = st.columns([4.2, 1])
     with sb_top1:
@@ -534,14 +563,14 @@ with st.sidebar:
     
     df_año = df_raw[df_raw['AÑO'] == año_seleccionado]
     
-    # 2. SLICER DE MESES (INDENTADO)
+    # 2. SLICER DE MESES (SLIM INDENTADO)
     meses_disp = sorted(df_año['MES_NUM'].dropna().astype(int).unique().tolist())
     
     if 'sel_meses' not in st.session_state or st.session_state.get('last_year') != año_seleccionado:
         st.session_state.sel_meses = []
         st.session_state.last_year = año_seleccionado
 
-    st.markdown('<div class="sidebar-section-gap"><b>🗓️ Meses</b></div>', unsafe_allow_html=True)
+    st.markdown('<span class="sb-label">🗓️ Meses</span>', unsafe_allow_html=True)
     n_meses_sel = len(st.session_state.sel_meses)
     label_meses = "Todos (Sin filtro)" if n_meses_sel == 0 else (
         MESES_DICT.get(st.session_state.sel_meses[0], "") if n_meses_sel == 1 else f"{n_meses_sel} meses sel."
@@ -569,13 +598,13 @@ with st.sidebar:
 
     selected_meses = st.session_state.sel_meses if len(st.session_state.sel_meses) > 0 else meses_disp
 
-    # 3. SLICER DE VARIEDAD / CALIBRE (INDENTADO)
+    # 3. SLICER DE VARIEDAD / CALIBRE (SLIM INDENTADO)
     prods_reales = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
     
     if 'sel_prods' not in st.session_state:
         st.session_state.sel_prods = []
 
-    st.markdown('<div class="sidebar-section-gap"><b>🏷️ Variedad / Calibre</b></div>', unsafe_allow_html=True)
+    st.markdown('<span class="sb-label">🏷️ Variedad / Calibre</span>', unsafe_allow_html=True)
     n_prods_sel = len(st.session_state.sel_prods)
     label_prods = "Todas (Sin filtro)" if n_prods_sel == 0 else (
         st.session_state.sel_prods[0] if n_prods_sel == 1 else f"{n_prods_sel} variedades sel."
@@ -604,7 +633,7 @@ with st.sidebar:
     selected_prods = st.session_state.sel_prods if len(st.session_state.sel_prods) > 0 else prods_reales
 
     # 4. FILTRO TIPO CALENDARIO (INDENTADO)
-    st.markdown('<div class="sidebar-section-gap"><b>📅 Rango de Fechas</b></div>', unsafe_allow_html=True)
+    st.markdown('<span class="sb-label">📅 Rango de Fechas</span>', unsafe_allow_html=True)
     min_date_año = df_año['FECHA_EMISION'].min().date()
     max_date_año = df_año['FECHA_EMISION'].max().date()
     
@@ -621,7 +650,6 @@ with st.sidebar:
         )
     
     # 5. AGRUPACIÓN TEMPORAL BASE (INDENTADA)
-    st.markdown('<div class="sidebar-section-gap"></div>', unsafe_allow_html=True)
     periodo_seleccionado = st.radio(
         "⏱️ Agrupación Temporal",
         options=["Mensual", "Semanal"],
@@ -769,7 +797,6 @@ if vista_activa == "📊 Resumen & Evolución":
     st.markdown(f'<div class="chart-header">📈 {titulo_grafico}</div>', unsafe_allow_html=True)
     fig_dual = go.Figure()
 
-    # Trazado de Área Sombreada Sutil (solo en vista mensual general)
     tiene_ref_mercado = False
     if es_vista_mensual and not mes_en_drilldown and len(df_trend) > 1:
         df_trend['MES_INT'] = df_trend[col_actual].str.split('-').str[1].astype(int)

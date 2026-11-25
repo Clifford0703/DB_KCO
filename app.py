@@ -456,6 +456,28 @@ def normalize_text(val):
     s = str(val).strip().lower()
     return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
+def clean_id_str(val):
+    """Normaliza IDs numéricos/texto de SharePoint (ej. 250.0 -> '250', 1 -> '1')."""
+    if pd.isna(val):
+        return ""
+    s = str(val).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s
+
+def find_col(df, candidates):
+    """Busca una columna en el DataFrame ignorando mayúsculas, tildes, espacios y sufijos LookupId."""
+    if df.empty:
+        return None
+    norm_map = {normalize_text(c).replace(" ", ""): c for c in df.columns}
+    for cand in candidates:
+        key = normalize_text(cand).replace(" ", "")
+        if key in norm_map:
+            return norm_map[key]
+        if (key + "lookupid") in norm_map:
+            return norm_map[key + "lookupid"]
+    return None
+
 def style_semaphore(val):
     if pd.isna(val):
         return ''
@@ -495,7 +517,8 @@ def get_sharepoint_site_id(headers):
 def fetch_ms_list_df(headers, site_id, list_name):
     """
     Lee una lista de SharePoint/Microsoft Lists resolviendo automáticamente
-    el mapa displayName -> internalName (ej. 'Precio OC' -> 'field_9') vía /columns.
+    el mapa displayName -> internalName (ej. 'Precio OC' -> 'field_9') vía /columns,
+    incluyendo columnas de tipo Búsqueda (*LookupId) y el ID de elemento SharePoint.
     """
     cols_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/columns"
     cols_resp = requests.get(cols_url, headers=headers, timeout=30)
@@ -505,7 +528,9 @@ def fetch_ms_list_df(headers, site_id, list_name):
         int_name = col.get("name")
         disp_name = col.get("displayName")
         if int_name and disp_name:
-            internal_to_display[int_name] = disp_name.strip()
+            clean_disp = disp_name.strip()
+            internal_to_display[int_name] = clean_disp
+            internal_to_display[f"{int_name}LookupId"] = clean_disp
 
     items_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/items?expand=fields&$top=500"
     rows = []
@@ -515,9 +540,12 @@ def fetch_ms_list_df(headers, site_id, list_name):
         payload = resp.json()
         for item in payload.get("value", []):
             fields = item.get("fields", {})
-            mapped_row = {}
+            mapped_row = {"_SP_ITEM_ID": clean_id_str(item.get("id"))}
             for k, v in fields.items():
                 col_label = internal_to_display.get(k, k)
+                # Si la columna es un diccionario/lista de lookup, extraer el valor legible o LookupId
+                if isinstance(v, dict):
+                    v = v.get("LookupValue") or v.get("Title") or v.get("Value") or str(v)
                 mapped_row[col_label] = v
             rows.append(mapped_row)
         items_url = payload.get("@odata.nextLink")
@@ -534,36 +562,92 @@ def load_all_data():
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     site_id = get_sharepoint_site_id(headers)
 
+    # Descargar tabla de hechos y tablas de dimensión relacionadas por columnas Lookup
     df_fact = fetch_ms_list_df(headers, site_id, LIST_FACT_PALTAS)
     df_dim_prod = fetch_ms_list_df(headers, site_id, LIST_DIM_PRODUCTOS)
+    df_dim_cli  = fetch_ms_list_df(headers, site_id, LIST_DIM_CLIENTE)
 
     if df_fact.empty:
         raise ValueError(f"La lista '{LIST_FACT_PALTAS}' no devolvió registros.")
 
+    # Detección flexible de columnas en factPaltas
+    col_tipo      = find_col(df_fact, ['Tipo'])
+    col_cod_prod  = find_col(df_fact, ['CodProducto', 'Cod Producto', 'Producto'])
+    col_fecha     = find_col(df_fact, ['Fecha', 'Fecha Emision'])
+    col_cant      = find_col(df_fact, ['Cantidad Total', 'CantidadTotal'])
+    col_precio    = find_col(df_fact, ['Precio OC', 'PrecioOC'])
+    col_peso_jaba = find_col(df_fact, ['PesoJabaKg', 'Peso Jaba Kg'])
+    col_oc        = find_col(df_fact, ['OC', 'Nro OC'])
+    col_cliente   = find_col(df_fact, ['Cliente'])
+
+    faltantes = [
+        nombre for nombre, col in [
+            ('CodProducto', col_cod_prod),
+            ('Fecha', col_fecha),
+            ('Cantidad Total', col_cant),
+            ('Precio OC', col_precio)
+        ] if col is None
+    ]
+    if faltantes:
+        raise KeyError(
+            f"No se encontraron las columnas {faltantes} en '{LIST_FACT_PALTAS}'. "
+            f"Columnas disponibles detectadas: {list(df_fact.columns)}"
+        )
+
     # Filtrar únicamente operaciones de tipo 'compra/venta' (devoluciones pausadas por ahora)
-    if 'Tipo' in df_fact.columns:
-        df_fact = df_fact[df_fact['Tipo'].apply(normalize_text) == 'compra/venta'].copy()
+    if col_tipo:
+        df_fact = df_fact[df_fact[col_tipo].apply(normalize_text) == 'compra/venta'].copy()
 
-    # Normalizar llave de producto y cruzar con dimProductos
-    df_fact['COD_KEY'] = df_fact['CodProducto'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+    # 1. RESOLUCIÓN DE LOOKUP: CodProducto -> dimProductos (ID SharePoint -> COD_PRODUCTO y DESCRIPCIÓN)
+    raw_prod_lookup = df_fact[col_cod_prod].apply(clean_id_str)
+    if not df_dim_prod.empty:
+        col_dim_pk   = find_col(df_dim_prod, ['COD_PRODUCTO', 'CodProducto', 'Title'])
+        col_dim_desc = find_col(df_dim_prod, ['DESCRIPCIÓN', 'DESCRIPCION', 'Descripcion'])
 
-    if not df_dim_prod.empty and 'COD_PRODUCTO' in df_dim_prod.columns:
-        df_dim_prod['COD_KEY'] = df_dim_prod['COD_PRODUCTO'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
-        col_desc = next((c for c in df_dim_prod.columns if normalize_text(c) == 'descripcion'), None)
-        if col_desc:
-            map_desc = dict(zip(df_dim_prod['COD_KEY'], df_dim_prod[col_desc].astype(str).str.strip()))
-            df_fact['DESCRIPCION_PRODUCTO'] = df_fact['COD_KEY'].map(map_desc).fillna(df_fact['COD_KEY'])
+        if col_dim_pk:
+            df_dim_prod['COD_KEY'] = df_dim_prod[col_dim_pk].apply(clean_id_str)
+            # Mapear desde _SP_ITEM_ID (LookupId) hacia el COD_PRODUCTO real (ej. '1' -> '280')
+            map_id_to_cod = dict(zip(df_dim_prod['_SP_ITEM_ID'], df_dim_prod['COD_KEY']))
+            # Si el valor ya viene como COD_PRODUCTO directo, conservarlo; si viene como ID interno de SharePoint, traducirlo
+            df_fact['COD_KEY'] = raw_prod_lookup.apply(
+                lambda x: x if x in set(df_dim_prod['COD_KEY']) else map_id_to_cod.get(x, x)
+            )
+            if col_dim_desc:
+                map_desc = dict(zip(df_dim_prod['COD_KEY'], df_dim_prod[col_dim_desc].astype(str).str.strip()))
+                df_fact['DESCRIPCION_PRODUCTO'] = df_fact['COD_KEY'].map(map_desc).fillna(df_fact['COD_KEY'])
+            else:
+                df_fact['DESCRIPCION_PRODUCTO'] = df_fact['COD_KEY']
         else:
+            df_fact['COD_KEY'] = raw_prod_lookup
             df_fact['DESCRIPCION_PRODUCTO'] = df_fact['COD_KEY']
     else:
+        df_fact['COD_KEY'] = raw_prod_lookup
         df_fact['DESCRIPCION_PRODUCTO'] = df_fact['COD_KEY']
 
     # Peso unitario del fruto derivado directamente del código numérico de dimProductos (ej. 250 -> 0.250 kg)
     cod_num = pd.to_numeric(df_fact['COD_KEY'], errors='coerce')
     df_fact['PESO_FRUTO_KG'] = np.where(cod_num > 0, cod_num / 1000.0, np.nan)
 
-    # Mapeo estándar de campos operativos
-    df_fact['FECHA_EMISION'] = pd.to_datetime(df_fact['Fecha'], errors='coerce')
+    # 2. RESOLUCIÓN DE LOOKUP: Cliente -> dimCliente (ID SharePoint -> RAZON_SOCIAL)
+    if col_cliente:
+        raw_cli_lookup = df_fact[col_cliente].apply(clean_id_str)
+        if not df_dim_cli.empty:
+            col_cli_rs = find_col(df_dim_cli, ['RAZON_SOCIAL', 'Razon Social', 'Title', 'Cliente'])
+            if col_cli_rs:
+                df_dim_cli['CLI_NAME'] = df_dim_cli[col_cli_rs].fillna('').astype(str).str.strip()
+                map_id_to_cli = dict(zip(df_dim_cli['_SP_ITEM_ID'], df_dim_cli['CLI_NAME']))
+                df_fact['CLIENTE'] = raw_cli_lookup.apply(
+                    lambda x: x if x in set(df_dim_cli['CLI_NAME']) else map_id_to_cli.get(x, x)
+                )
+            else:
+                df_fact['CLIENTE'] = raw_cli_lookup
+        else:
+            df_fact['CLIENTE'] = raw_cli_lookup
+    else:
+        df_fact['CLIENTE'] = ''
+
+    # 3. MAPEO ESTÁNDAR DE CAMPOS OPERATIVOS Y FECHAS
+    df_fact['FECHA_EMISION'] = pd.to_datetime(df_fact[col_fecha], errors='coerce')
     if df_fact['FECHA_EMISION'].dt.tz is not None:
         df_fact['FECHA_EMISION'] = df_fact['FECHA_EMISION'].dt.tz_convert(None)
 
@@ -573,13 +657,13 @@ def load_all_data():
     df_fact['MES_AÑO'] = df_fact['FECHA_EMISION'].dt.strftime('%Y-%m')
     df_fact['SEMANA_AÑO'] = df_fact['FECHA_EMISION'].dt.strftime('%Y-W%V')
 
-    df_fact['KILOS_SOLICITADOS'] = pd.to_numeric(df_fact['Cantidad Total'], errors='coerce').fillna(0)
-    df_fact['PRECIO_KG'] = pd.to_numeric(df_fact['Precio OC'], errors='coerce').fillna(0)
+    df_fact['KILOS_SOLICITADOS'] = pd.to_numeric(df_fact[col_cant], errors='coerce').fillna(0)
+    df_fact['PRECIO_KG'] = pd.to_numeric(df_fact[col_precio], errors='coerce').fillna(0)
     df_fact['VALOR_COMERCIAL'] = df_fact['KILOS_SOLICITADOS'] * df_fact['PRECIO_KG']
 
     # Peso por jaba desde columna PesoJabaKg (respaldo 18.0 kg)
-    if 'PesoJabaKg' in df_fact.columns:
-        peso_jaba_serie = pd.to_numeric(df_fact['PesoJabaKg'], errors='coerce')
+    if col_peso_jaba:
+        peso_jaba_serie = pd.to_numeric(df_fact[col_peso_jaba], errors='coerce')
         df_fact['PESO_JABA_EFECTIVO'] = np.where(peso_jaba_serie > 0, peso_jaba_serie, DEFAULT_KG_PER_JABA)
     else:
         df_fact['PESO_JABA_EFECTIVO'] = DEFAULT_KG_PER_JABA
@@ -588,8 +672,7 @@ def load_all_data():
     df_fact['FRUTOS_EST'] = np.where(df_fact['PESO_FRUTO_KG'].notna(), df_fact['KILOS_SOLICITADOS'] / df_fact['PESO_FRUTO_KG'], 0)
     df_fact['PRECIO_FRUTO_EST'] = df_fact['PRECIO_KG'] * df_fact['PESO_FRUTO_KG']
 
-    df_fact['NRO_OC'] = df_fact['OC'].fillna('').astype(str).str.strip() if 'OC' in df_fact.columns else ''
-    df_fact['CLIENTE'] = df_fact['Cliente'].fillna('').astype(str).str.strip() if 'Cliente' in df_fact.columns else ''
+    df_fact['NRO_OC'] = df_fact[col_oc].fillna('').astype(str).str.strip() if col_oc else ''
 
     # Carga de precios mayoristas locales (reporte_fuerte.xls) para Hoja 2
     df_mercado = pd.DataFrame()

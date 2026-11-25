@@ -4,7 +4,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import requests
+import msal
 import os
+import unicodedata
+from urllib.parse import urlparse
 from datetime import datetime
 
 # --- CONFIGURACIÓN DE PÁGINA ---
@@ -15,6 +19,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# --- NOMBRES DE LISTAS EN SHAREPOINT / MICROSOFT LISTS ---
+LIST_FACT_PALTAS    = "factPaltas"
+LIST_DIM_PRODUCTOS  = "dimProductos"
+LIST_DIM_CLIENTE    = "dimCliente"
+LIST_DIM_PROVEEDOR  = "dimProveedor"
+LIST_FACT_GASTOS    = "factGastos"
+LIST_FACT_ADELANTOS = "factAdelantos"
+
 # --- PALETA CORPORATIVA PREMIUM ---
 COLOR_PRIMARY = "#0f3a28"
 COLOR_BARRA_CLARA = "#34d399"
@@ -24,12 +36,18 @@ COLOR_NEUTRAL = "#0f172a"
 COLOR_INFO = "#2563eb"
 COLOR_MERCADO = "#64748b"
 
+# Colores por descripción legible de dimProductos (y respaldo por código)
 VARIEDAD_COLORS = {
-    'PALTA-FUERTE-A-KG': '#0f3a28',
-    'PALTA-FUERTE-V-KG': '#2563eb',
-    'PALTA-FUERTE-P-KG': '#f59e0b',
-    'PALTA-FUERTE-C-KG': '#7c3aed',
-    'PALTA-M-KG':        '#10b981'
+    'PALTA FUERTE A': '#0f3a28',
+    'PALTA FUERTE V': '#2563eb',
+    'PALTA FUERTE P': '#f59e0b',
+    'PALTA FUERTE C': '#7c3aed',
+    'PALTA M':        '#10b981',
+    '250':            '#0f3a28',
+    '280':            '#2563eb',
+    '220':            '#f59e0b',
+    '200':            '#7c3aed',
+    '150':            '#10b981'
 }
 
 MESES_DICT = {
@@ -430,14 +448,13 @@ if 'drilldown_mes' not in st.session_state:
 if 'semana_seleccionada' not in st.session_state:
     st.session_state.semana_seleccionada = None
 
-PRODUCT_WEIGHTS = {
-    'PALTA-FUERTE-A-KG': 0.250,
-    'PALTA-FUERTE-V-KG': 0.280,
-    'PALTA-FUERTE-P-KG': 0.220,
-    'PALTA-FUERTE-C-KG': 0.200,
-    'PALTA-M-KG': 0.150
-}
-KG_PER_JABA = 18.0
+DEFAULT_KG_PER_JABA = 18.0
+
+def normalize_text(val):
+    if pd.isna(val):
+        return ""
+    s = str(val).strip().lower()
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
 def style_semaphore(val):
     if pd.isna(val):
@@ -449,40 +466,132 @@ def style_semaphore(val):
     else:
         return 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'
 
-# --- CARGA Y TRANSFORMACIÓN ---
-@st.cache_data
+# --- CONEXIÓN A MICROSOFT GRAPH API (MISMO ESQUEMA [sharepoint] QUE control-asistencia-kco) ---
+def get_graph_token():
+    sp = st.secrets["sharepoint"]
+    authority = f"https://login.microsoftonline.com/{sp['tenant_id']}"
+    app = msal.ConfidentialClientApplication(
+        sp["client_id"],
+        authority=authority,
+        client_credential=sp["client_secret"]
+    )
+    result = app.acquire_token_silent(["https://graph.microsoft.com/.default"], account=None)
+    if not result:
+        result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+    if "access_token" not in result:
+        raise RuntimeError(f"Error de autenticación Azure AD: {result.get('error_description', result)}")
+    return result["access_token"]
+
+def get_sharepoint_site_id(headers):
+    sp = st.secrets["sharepoint"]
+    parsed = urlparse(sp["site_url"].rstrip("/"))
+    site_host = parsed.netloc
+    site_path = parsed.path
+    url = f"https://graph.microsoft.com/v1.0/sites/{site_host}:{site_path}"
+    resp = requests.get(url, headers=headers, timeout=30)
+    resp.raise_for_status()
+    return resp.json()["id"]
+
+def fetch_ms_list_df(headers, site_id, list_name):
+    """
+    Lee una lista de SharePoint/Microsoft Lists resolviendo automáticamente
+    el mapa displayName -> internalName (ej. 'Precio OC' -> 'field_9') vía /columns.
+    """
+    cols_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/columns"
+    cols_resp = requests.get(cols_url, headers=headers, timeout=30)
+    cols_resp.raise_for_status()
+    internal_to_display = {}
+    for col in cols_resp.json().get("value", []):
+        int_name = col.get("name")
+        disp_name = col.get("displayName")
+        if int_name and disp_name:
+            internal_to_display[int_name] = disp_name.strip()
+
+    items_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/items?expand=fields&$top=500"
+    rows = []
+    while items_url:
+        resp = requests.get(items_url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        payload = resp.json()
+        for item in payload.get("value", []):
+            fields = item.get("fields", {})
+            mapped_row = {}
+            for k, v in fields.items():
+                col_label = internal_to_display.get(k, k)
+                mapped_row[col_label] = v
+            rows.append(mapped_row)
+        items_url = payload.get("@odata.nextLink")
+
+    df_out = pd.DataFrame(rows)
+    if not df_out.empty:
+        df_out = df_out.loc[:, ~df_out.columns.duplicated()]
+    return df_out
+
+# --- CARGA Y TRANSFORMACIÓN DESDE MICROSOFT LISTS + REPORTE MAYORISTA ---
+@st.cache_data(ttl=300)
 def load_all_data():
-    file_path = "Ordenes.xls"
-    try:
-        df = pd.read_excel(file_path, engine="xlrd")
-    except Exception:
-        try:
-            df = pd.read_excel(file_path, engine="calamine")
-        except Exception:
-            try:
-                df = pd.read_excel(file_path, engine="openpyxl")
-            except Exception:
-                df = pd.read_excel(file_path)
-            
-    df = df.loc[:, ~df.columns.duplicated()]
-    df['FECHA_EMISION'] = pd.to_datetime(df['FECHA_EMISION'], format='%d-%m-%Y', errors='coerce')
-    df['AÑO'] = df['FECHA_EMISION'].dt.year
-    df['MES_NUM'] = df['FECHA_EMISION'].dt.month
-    df['MES_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-%m')
-    df['SEMANA_AÑO'] = df['FECHA_EMISION'].dt.strftime('%Y-W%V')
-    
-    df['KILOS_SOLICITADOS'] = df['UNIDADES_SOLICITADAS'].fillna(0)
-    df['PRECIO_KG'] = df['PRECIO_FINAL_NETO'].fillna(0)
-    df['VALOR_COMERCIAL'] = df['KILOS_SOLICITADOS'] * df['PRECIO_KG']
-    
-    def get_fruto_weight(prod):
-        return PRODUCT_WEIGHTS.get(str(prod).strip().upper(), np.nan)
-        
-    df['PESO_FRUTO_KG'] = df['DESCRIPCION_PRODUCTO'].apply(get_fruto_weight)
-    df['FRUTOS_EST'] = np.where(df['PESO_FRUTO_KG'].notna(), df['KILOS_SOLICITADOS'] / df['PESO_FRUTO_KG'], 0)
-    df['JABAS_EST'] = df['KILOS_SOLICITADOS'] / KG_PER_JABA
-    df['PRECIO_FRUTO_EST'] = df['PRECIO_KG'] * df['PESO_FRUTO_KG']
-    
+    token = get_graph_token()
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    site_id = get_sharepoint_site_id(headers)
+
+    df_fact = fetch_ms_list_df(headers, site_id, LIST_FACT_PALTAS)
+    df_dim_prod = fetch_ms_list_df(headers, site_id, LIST_DIM_PRODUCTOS)
+
+    if df_fact.empty:
+        raise ValueError(f"La lista '{LIST_FACT_PALTAS}' no devolvió registros.")
+
+    # Filtrar únicamente operaciones de tipo 'compra/venta' (devoluciones pausadas por ahora)
+    if 'Tipo' in df_fact.columns:
+        df_fact = df_fact[df_fact['Tipo'].apply(normalize_text) == 'compra/venta'].copy()
+
+    # Normalizar llave de producto y cruzar con dimProductos
+    df_fact['COD_KEY'] = df_fact['CodProducto'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+
+    if not df_dim_prod.empty and 'COD_PRODUCTO' in df_dim_prod.columns:
+        df_dim_prod['COD_KEY'] = df_dim_prod['COD_PRODUCTO'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+        col_desc = next((c for c in df_dim_prod.columns if normalize_text(c) == 'descripcion'), None)
+        if col_desc:
+            map_desc = dict(zip(df_dim_prod['COD_KEY'], df_dim_prod[col_desc].astype(str).str.strip()))
+            df_fact['DESCRIPCION_PRODUCTO'] = df_fact['COD_KEY'].map(map_desc).fillna(df_fact['COD_KEY'])
+        else:
+            df_fact['DESCRIPCION_PRODUCTO'] = df_fact['COD_KEY']
+    else:
+        df_fact['DESCRIPCION_PRODUCTO'] = df_fact['COD_KEY']
+
+    # Peso unitario del fruto derivado directamente del código numérico de dimProductos (ej. 250 -> 0.250 kg)
+    cod_num = pd.to_numeric(df_fact['COD_KEY'], errors='coerce')
+    df_fact['PESO_FRUTO_KG'] = np.where(cod_num > 0, cod_num / 1000.0, np.nan)
+
+    # Mapeo estándar de campos operativos
+    df_fact['FECHA_EMISION'] = pd.to_datetime(df_fact['Fecha'], errors='coerce')
+    if df_fact['FECHA_EMISION'].dt.tz is not None:
+        df_fact['FECHA_EMISION'] = df_fact['FECHA_EMISION'].dt.tz_convert(None)
+
+    df_fact = df_fact.dropna(subset=['FECHA_EMISION']).copy()
+    df_fact['AÑO'] = df_fact['FECHA_EMISION'].dt.year
+    df_fact['MES_NUM'] = df_fact['FECHA_EMISION'].dt.month
+    df_fact['MES_AÑO'] = df_fact['FECHA_EMISION'].dt.strftime('%Y-%m')
+    df_fact['SEMANA_AÑO'] = df_fact['FECHA_EMISION'].dt.strftime('%Y-W%V')
+
+    df_fact['KILOS_SOLICITADOS'] = pd.to_numeric(df_fact['Cantidad Total'], errors='coerce').fillna(0)
+    df_fact['PRECIO_KG'] = pd.to_numeric(df_fact['Precio OC'], errors='coerce').fillna(0)
+    df_fact['VALOR_COMERCIAL'] = df_fact['KILOS_SOLICITADOS'] * df_fact['PRECIO_KG']
+
+    # Peso por jaba desde columna PesoJabaKg (respaldo 18.0 kg)
+    if 'PesoJabaKg' in df_fact.columns:
+        peso_jaba_serie = pd.to_numeric(df_fact['PesoJabaKg'], errors='coerce')
+        df_fact['PESO_JABA_EFECTIVO'] = np.where(peso_jaba_serie > 0, peso_jaba_serie, DEFAULT_KG_PER_JABA)
+    else:
+        df_fact['PESO_JABA_EFECTIVO'] = DEFAULT_KG_PER_JABA
+
+    df_fact['JABAS_EST'] = df_fact['KILOS_SOLICITADOS'] / df_fact['PESO_JABA_EFECTIVO']
+    df_fact['FRUTOS_EST'] = np.where(df_fact['PESO_FRUTO_KG'].notna(), df_fact['KILOS_SOLICITADOS'] / df_fact['PESO_FRUTO_KG'], 0)
+    df_fact['PRECIO_FRUTO_EST'] = df_fact['PRECIO_KG'] * df_fact['PESO_FRUTO_KG']
+
+    df_fact['NRO_OC'] = df_fact['OC'].fillna('').astype(str).str.strip() if 'OC' in df_fact.columns else ''
+    df_fact['CLIENTE'] = df_fact['Cliente'].fillna('').astype(str).str.strip() if 'Cliente' in df_fact.columns else ''
+
+    # Carga de precios mayoristas locales (reporte_fuerte.xls) para Hoja 2
     df_mercado = pd.DataFrame()
     mkt_file = "reporte_fuerte.xls"
     if os.path.exists(mkt_file):
@@ -501,14 +610,14 @@ def load_all_data():
             df_mercado = df_m
         except Exception:
             df_mercado = pd.DataFrame()
-            
+
     timestamp_actualizacion = datetime.now().strftime("%d/%m/%Y %H:%M")
-    return df, df_mercado, timestamp_actualizacion
+    return df_fact, df_mercado, timestamp_actualizacion
 
 try:
     df_raw, df_mercado_raw, update_time = load_all_data()
 except Exception as e:
-    st.error(f"Error cargando los archivos: {e}")
+    st.error(f"Error conectando con Microsoft Lists / SharePoint: {e}")
     st.stop()
 
 # --- SIDEBAR: NAVEGACIÓN, PANTALLA COMPLETA, SLICERS UNIFICADOS Y MODO PRIVACIDAD ---
@@ -710,6 +819,7 @@ precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
 total_ocs = df['NRO_OC'].nunique()
 kg_promedio_oc = total_kg / total_ocs if total_ocs > 0 else 0
 total_jabas_est = df['JABAS_EST'].sum()
+peso_jaba_prom = df['PESO_JABA_EFECTIVO'].mean() if not df.empty else DEFAULT_KG_PER_JABA
 
 disp_facturacion = "S/ ••••••" if ocultar_precios else f"S/ {valor_comercial_total:,.0f}"
 disp_fact_sub = "Dato reservado" if ocultar_precios else "Venta total pactada"
@@ -756,7 +866,7 @@ st.markdown(f"""
                 <span class="kpi-badge">🚛 Logística</span>
             </div>
             <div class="kpi-value">{total_jabas_est:,.0f}</div>
-            <div class="kpi-sub">Ratio: 18 kg / jaba</div>
+            <div class="kpi-sub">Ratio: {peso_jaba_prom:.0f} kg / jaba</div>
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -950,7 +1060,7 @@ def render_evolucion_interactiva(df_base, periodo_sel, año_sel, ocultar_p, col_
     chart_key = "grafico_mensual_click" if not mes_en_drilldown else f"grafico_semanal_{mes_en_drilldown}"
     chart_event = st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG, key=chart_key, on_select="rerun", selection_mode="points")
 
-    # PROCESAMIENTO DE CLIC EN EL GRÁFICO DENTRO DEL FRAGMENTO (SIN RECARGAR TODA LA PÁGINA)
+    # PROCESAMIENTO DE CLIC EN EL GRÁFICO DENTRO DEL FRAGMENTO
     if es_vista_mensual and not mes_en_drilldown:
         st.session_state.semana_seleccionada = None
         if chart_event:
@@ -992,31 +1102,47 @@ def render_evolucion_interactiva(df_base, periodo_sel, año_sel, ocultar_p, col_
         st.session_state.semana_seleccionada = None
         etiqueta_filtro_tabla = f"Mes {mes_en_drilldown}" if mes_en_drilldown else f"Vista {periodo_sel}"
 
-    # PESTAÑA DESPLEGABLE: NUNCA SE ABRE SOLA (expanded=False); SI LA DESPLIEGAS, PERMANECE ABIERTA AL INTERACTUAR
+    # PESTAÑA DESPLEGABLE: SOLO CON FECHA Y MÉTRICAS RELEVANTES (SIN MES NI SEMANA REDUNDANTES)
     with st.expander("📋 Ver detalle de órdenes filtradas", expanded=False):
         st.caption(f"Filtro activo: **{etiqueta_filtro_tabla}** — **{len(df_detalle_grafico):,}** registros")
         df_tabla_det = df_detalle_grafico.sort_values(by=['FECHA_EMISION', 'NRO_OC'], ascending=[False, False]).copy()
-        df_tabla_det['FECHA_STR'] = df_tabla_det['FECHA_EMISION'].dt.strftime('%d/%m/%Y')
         
+        dias_es = {0: 'Lun', 1: 'Mar', 2: 'Mié', 3: 'Jue', 4: 'Vie', 5: 'Sáb', 6: 'Dom'}
+        df_tabla_det['FECHA_STR'] = df_tabla_det['FECHA_EMISION'].dt.strftime('%d/%m/%Y')
+        df_tabla_det['DIA_SEM'] = df_tabla_det['FECHA_EMISION'].dt.dayofweek.map(dias_es)
+        
+        total_kg_sub = df_tabla_det['KILOS_SOLICITADOS'].sum()
+        df_tabla_det['PART_KG_PCT'] = (df_tabla_det['KILOS_SOLICITADOS'] / total_kg_sub * 100) if total_kg_sub > 0 else 0
+
+        tiene_cliente = 'CLIENTE' in df_tabla_det.columns and (df_tabla_det['CLIENTE'] != '').any()
+
         if ocultar_p:
-            df_show = df_tabla_det[['FECHA_STR', 'MES_AÑO', 'SEMANA_AÑO', 'NRO_OC', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'JABAS_EST']].copy()
-            df_show.columns = ['Fecha', 'Mes', 'Semana', 'N° OC', 'Variedad / Calibre', 'Kilos (kg)', 'Jabas Est.']
+            cols_base = ['FECHA_STR', 'DIA_SEM', 'NRO_OC'] + (['CLIENTE'] if tiene_cliente else []) + ['DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PART_KG_PCT', 'JABAS_EST', 'FRUTOS_EST']
+            nombres_base = ['Fecha', 'Día', 'N° OC'] + (['Cliente'] if tiene_cliente else []) + ['Variedad / Calibre', 'Kilos (kg)', '% Part.', 'Jabas Est.', 'Frutos Est.']
+            df_show = df_tabla_det[cols_base].copy()
+            df_show.columns = nombres_base
             st.dataframe(
                 df_show.style.format({
                     'Kilos (kg)': '{:,.0f}',
-                    'Jabas Est.': '{:,.1f}'
+                    '% Part.': '{:.1f}%',
+                    'Jabas Est.': '{:,.1f}',
+                    'Frutos Est.': '{:,.0f}'
                 }),
                 use_container_width=True, height=220, hide_index=True
             )
         else:
-            df_show = df_tabla_det[['FECHA_STR', 'MES_AÑO', 'SEMANA_AÑO', 'NRO_OC', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PRECIO_KG', 'VALOR_COMERCIAL', 'JABAS_EST']].copy()
-            df_show.columns = ['Fecha', 'Mes', 'Semana', 'N° OC', 'Variedad / Calibre', 'Kilos (kg)', 'Precio (S/ /kg)', 'Valor Total (S/)', 'Jabas Est.']
+            cols_base = ['FECHA_STR', 'DIA_SEM', 'NRO_OC'] + (['CLIENTE'] if tiene_cliente else []) + ['DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'PART_KG_PCT', 'PRECIO_KG', 'VALOR_COMERCIAL', 'JABAS_EST', 'FRUTOS_EST']
+            nombres_base = ['Fecha', 'Día', 'N° OC'] + (['Cliente'] if tiene_cliente else []) + ['Variedad / Calibre', 'Kilos (kg)', '% Part.', 'Precio (S/ /kg)', 'Valor Total (S/)', 'Jabas Est.', 'Frutos Est.']
+            df_show = df_tabla_det[cols_base].copy()
+            df_show.columns = nombres_base
             st.dataframe(
                 df_show.style.format({
                     'Kilos (kg)': '{:,.0f}',
+                    '% Part.': '{:.1f}%',
                     'Precio (S/ /kg)': 'S/ {:.2f}',
                     'Valor Total (S/)': 'S/ {:,.2f}',
-                    'Jabas Est.': '{:,.1f}'
+                    'Jabas Est.': '{:,.1f}',
+                    'Frutos Est.': '{:,.0f}'
                 }),
                 use_container_width=True, height=220, hide_index=True
             )
@@ -1051,7 +1177,6 @@ def render_evolucion_interactiva(df_base, periodo_sel, año_sel, ocultar_p, col_
 # ==========================================================
 if vista_activa == "📊 Resumen & Evolución":
     
-    # Renderizar bloque superior interactivo como fragmento aislado
     render_evolucion_interactiva(df, periodo_seleccionado, año_seleccionado, ocultar_precios, col_periodo, label_periodo)
 
     df_trend_base = df.groupby(col_periodo).agg(

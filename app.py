@@ -35,8 +35,8 @@ COLOR_ACCENT = "#f59e0b"
 COLOR_NEUTRAL = "#0f172a"
 COLOR_INFO = "#2563eb"
 COLOR_MERCADO = "#64748b"
+COLOR_DANGER = "#dc2626"
 
-# Colores por descripción legible de dimProductos (y respaldo por código)
 VARIEDAD_COLORS = {
     'PALTA FUERTE A': '#0f3a28',
     'PALTA FUERTE V': '#2563eb',
@@ -397,6 +397,13 @@ st.markdown(f"""
     .kpi-jabas .kpi-badge {{ background: #d1fae5; color: #047857; }}
     .kpi-jabas .kpi-sub {{ color: #059669; }}
 
+    .kpi-danger {{
+        background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+        border-top: 3.5px solid #dc2626;
+    }}
+    .kpi-danger .kpi-badge {{ background: #fee2e2; color: #b91c1c; }}
+    .kpi-danger .kpi-sub {{ color: #dc2626; }}
+
     /* INSIGHT CARDS EJECUTIVOS */
     .chart-insight {{
         background-color: #ffffff;
@@ -488,6 +495,16 @@ def style_semaphore(val):
     else:
         return 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'
 
+def style_margin_pct(val):
+    if pd.isna(val):
+        return ''
+    if val >= 20.0:
+        return 'background-color: #dcfce7; color: #166534; font-weight: bold;'
+    elif val < 10.0:
+        return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;'
+    else:
+        return 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'
+
 # --- CONEXIÓN A MICROSOFT GRAPH API (MISMO ESQUEMA [sharepoint] QUE control-asistencia-kco) ---
 def get_graph_token():
     sp = st.secrets["sharepoint"]
@@ -514,46 +531,49 @@ def get_sharepoint_site_id(headers):
     resp.raise_for_status()
     return resp.json()["id"]
 
-def fetch_ms_list_df(headers, site_id, list_name):
+def fetch_ms_list_df(headers, site_id, list_name, optional=False):
     """
     Lee una lista de SharePoint/Microsoft Lists resolviendo automáticamente
-    el mapa displayName -> internalName (ej. 'Precio OC' -> 'field_9') vía /columns,
-    incluyendo columnas de tipo Búsqueda (*LookupId) y el ID de elemento SharePoint.
+    el mapa displayName -> internalName vía /columns, incluyendo columnas LookupId.
     """
-    cols_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/columns"
-    cols_resp = requests.get(cols_url, headers=headers, timeout=30)
-    cols_resp.raise_for_status()
-    internal_to_display = {}
-    for col in cols_resp.json().get("value", []):
-        int_name = col.get("name")
-        disp_name = col.get("displayName")
-        if int_name and disp_name:
-            clean_disp = disp_name.strip()
-            internal_to_display[int_name] = clean_disp
-            internal_to_display[f"{int_name}LookupId"] = clean_disp
+    try:
+        cols_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/columns"
+        cols_resp = requests.get(cols_url, headers=headers, timeout=30)
+        cols_resp.raise_for_status()
+        internal_to_display = {}
+        for col in cols_resp.json().get("value", []):
+            int_name = col.get("name")
+            disp_name = col.get("displayName")
+            if int_name and disp_name:
+                clean_disp = disp_name.strip()
+                internal_to_display[int_name] = clean_disp
+                internal_to_display[f"{int_name}LookupId"] = clean_disp
 
-    items_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/items?expand=fields&$top=500"
-    rows = []
-    while items_url:
-        resp = requests.get(items_url, headers=headers, timeout=30)
-        resp.raise_for_status()
-        payload = resp.json()
-        for item in payload.get("value", []):
-            fields = item.get("fields", {})
-            mapped_row = {"_SP_ITEM_ID": clean_id_str(item.get("id"))}
-            for k, v in fields.items():
-                col_label = internal_to_display.get(k, k)
-                # Si la columna es un diccionario/lista de lookup, extraer el valor legible o LookupId
-                if isinstance(v, dict):
-                    v = v.get("LookupValue") or v.get("Title") or v.get("Value") or str(v)
-                mapped_row[col_label] = v
-            rows.append(mapped_row)
-        items_url = payload.get("@odata.nextLink")
+        items_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/items?expand=fields&$top=500"
+        rows = []
+        while items_url:
+            resp = requests.get(items_url, headers=headers, timeout=30)
+            resp.raise_for_status()
+            payload = resp.json()
+            for item in payload.get("value", []):
+                fields = item.get("fields", {})
+                mapped_row = {"_SP_ITEM_ID": clean_id_str(item.get("id"))}
+                for k, v in fields.items():
+                    col_label = internal_to_display.get(k, k)
+                    if isinstance(v, dict):
+                        v = v.get("LookupValue") or v.get("Title") or v.get("Value") or str(v)
+                    mapped_row[col_label] = v
+                rows.append(mapped_row)
+            items_url = payload.get("@odata.nextLink")
 
-    df_out = pd.DataFrame(rows)
-    if not df_out.empty:
-        df_out = df_out.loc[:, ~df_out.columns.duplicated()]
-    return df_out
+        df_out = pd.DataFrame(rows)
+        if not df_out.empty:
+            df_out = df_out.loc[:, ~df_out.columns.duplicated()]
+        return df_out
+    except Exception:
+        if optional:
+            return pd.DataFrame()
+        raise
 
 # --- CARGA Y TRANSFORMACIÓN DESDE MICROSOFT LISTS + REPORTE MAYORISTA ---
 @st.cache_data(ttl=300)
@@ -562,23 +582,29 @@ def load_all_data():
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     site_id = get_sharepoint_site_id(headers)
 
-    # Descargar tabla de hechos y tablas de dimensión relacionadas por columnas Lookup
-    df_fact = fetch_ms_list_df(headers, site_id, LIST_FACT_PALTAS)
+    # Descargar tablas de hechos y dimensiones desde Microsoft Lists
+    df_fact     = fetch_ms_list_df(headers, site_id, LIST_FACT_PALTAS)
     df_dim_prod = fetch_ms_list_df(headers, site_id, LIST_DIM_PRODUCTOS)
-    df_dim_cli  = fetch_ms_list_df(headers, site_id, LIST_DIM_CLIENTE)
+    df_dim_cli  = fetch_ms_list_df(headers, site_id, LIST_DIM_CLIENTE, optional=True)
+    df_dim_prov = fetch_ms_list_df(headers, site_id, LIST_DIM_PROVEEDOR, optional=True)
+    df_gastos   = fetch_ms_list_df(headers, site_id, LIST_FACT_GASTOS, optional=True)
 
     if df_fact.empty:
         raise ValueError(f"La lista '{LIST_FACT_PALTAS}' no devolvió registros.")
 
     # Detección flexible de columnas en factPaltas
-    col_tipo      = find_col(df_fact, ['Tipo'])
-    col_cod_prod  = find_col(df_fact, ['CodProducto', 'Cod Producto', 'Producto'])
-    col_fecha     = find_col(df_fact, ['Fecha', 'Fecha Emision'])
-    col_cant      = find_col(df_fact, ['Cantidad Total', 'CantidadTotal'])
-    col_precio    = find_col(df_fact, ['Precio OC', 'PrecioOC'])
-    col_peso_jaba = find_col(df_fact, ['PesoJabaKg', 'Peso Jaba Kg'])
-    col_oc        = find_col(df_fact, ['OC', 'Nro OC'])
-    col_cliente   = find_col(df_fact, ['Cliente'])
+    col_tipo       = find_col(df_fact, ['Tipo'])
+    col_cod_prod   = find_col(df_fact, ['CodProducto', 'Cod Producto', 'Producto'])
+    col_fecha      = find_col(df_fact, ['Fecha', 'Fecha Emision'])
+    col_cant       = find_col(df_fact, ['Cantidad Total', 'CantidadTotal'])
+    col_precio     = find_col(df_fact, ['Precio OC', 'PrecioOC'])
+    col_costo_prov = find_col(df_fact, ['Costo Proveedor', 'CostoProveedor'])
+    col_costo_dev  = find_col(df_fact, ['Costo Proveedor (DEV)', 'Costo Proveedor DEV', 'CostoProveedorDEV'])
+    col_jabas_real = find_col(df_fact, ['Jabas'])
+    col_peso_jaba  = find_col(df_fact, ['PesoJabaKg', 'Peso Jaba Kg'])
+    col_oc         = find_col(df_fact, ['OC', 'Nro OC'])
+    col_cliente    = find_col(df_fact, ['Cliente'])
+    col_proveedor  = find_col(df_fact, ['Proveedor'])
 
     faltantes = [
         nombre for nombre, col in [
@@ -594,11 +620,13 @@ def load_all_data():
             f"Columnas disponibles detectadas: {list(df_fact.columns)}"
         )
 
-    # Filtrar únicamente operaciones de tipo 'compra/venta' (devoluciones pausadas por ahora)
+    # Normalizar tipo de operación: 'compra/venta' vs 'devolucion'
     if col_tipo:
-        df_fact = df_fact[df_fact[col_tipo].apply(normalize_text) == 'compra/venta'].copy()
+        df_fact['TIPO_NORM'] = df_fact[col_tipo].apply(normalize_text)
+    else:
+        df_fact['TIPO_NORM'] = 'compra/venta'
 
-    # 1. RESOLUCIÓN DE LOOKUP: CodProducto -> dimProductos (ID SharePoint -> COD_PRODUCTO y DESCRIPCIÓN)
+    # 1. RESOLUCIÓN DE LOOKUP: CodProducto -> dimProductos
     raw_prod_lookup = df_fact[col_cod_prod].apply(clean_id_str)
     if not df_dim_prod.empty:
         col_dim_pk   = find_col(df_dim_prod, ['COD_PRODUCTO', 'CodProducto', 'Title'])
@@ -606,9 +634,7 @@ def load_all_data():
 
         if col_dim_pk:
             df_dim_prod['COD_KEY'] = df_dim_prod[col_dim_pk].apply(clean_id_str)
-            # Mapear desde _SP_ITEM_ID (LookupId) hacia el COD_PRODUCTO real (ej. '1' -> '280')
             map_id_to_cod = dict(zip(df_dim_prod['_SP_ITEM_ID'], df_dim_prod['COD_KEY']))
-            # Si el valor ya viene como COD_PRODUCTO directo, conservarlo; si viene como ID interno de SharePoint, traducirlo
             df_fact['COD_KEY'] = raw_prod_lookup.apply(
                 lambda x: x if x in set(df_dim_prod['COD_KEY']) else map_id_to_cod.get(x, x)
             )
@@ -624,11 +650,10 @@ def load_all_data():
         df_fact['COD_KEY'] = raw_prod_lookup
         df_fact['DESCRIPCION_PRODUCTO'] = df_fact['COD_KEY']
 
-    # Peso unitario del fruto derivado directamente del código numérico de dimProductos (ej. 250 -> 0.250 kg)
     cod_num = pd.to_numeric(df_fact['COD_KEY'], errors='coerce')
     df_fact['PESO_FRUTO_KG'] = np.where(cod_num > 0, cod_num / 1000.0, np.nan)
 
-    # 2. RESOLUCIÓN DE LOOKUP: Cliente -> dimCliente (ID SharePoint -> RAZON_SOCIAL)
+    # 2. RESOLUCIÓN DE LOOKUP: Cliente -> dimCliente
     if col_cliente:
         raw_cli_lookup = df_fact[col_cliente].apply(clean_id_str)
         if not df_dim_cli.empty:
@@ -646,7 +671,34 @@ def load_all_data():
     else:
         df_fact['CLIENTE'] = ''
 
-    # 3. MAPEO ESTÁNDAR DE CAMPOS OPERATIVOS Y FECHAS
+    # 3. RESOLUCIÓN DE LOOKUP: Proveedor -> dimProveedor (+ Provincia)
+    if col_proveedor:
+        raw_prov_lookup = df_fact[col_proveedor].apply(clean_id_str)
+        if not df_dim_prov.empty:
+            col_prov_rs   = find_col(df_dim_prov, ['RAZON_SOCIAL', 'Razon Social', 'Title', 'Proveedor'])
+            col_prov_zona = find_col(df_dim_prov, ['PROVINCIA', 'Provincia'])
+            if col_prov_rs:
+                df_dim_prov['PROV_NAME'] = df_dim_prov[col_prov_rs].fillna('').astype(str).str.strip()
+                map_id_to_prov = dict(zip(df_dim_prov['_SP_ITEM_ID'], df_dim_prov['PROV_NAME']))
+                df_fact['PROVEEDOR'] = raw_prov_lookup.apply(
+                    lambda x: x if x in set(df_dim_prov['PROV_NAME']) else map_id_to_prov.get(x, x)
+                )
+                if col_prov_zona:
+                    map_prov_zona = dict(zip(df_dim_prov['PROV_NAME'], df_dim_prov[col_prov_zona].fillna('').astype(str).str.strip()))
+                    df_fact['PROVINCIA_PROV'] = df_fact['PROVEEDOR'].map(map_prov_zona).fillna('')
+                else:
+                    df_fact['PROVINCIA_PROV'] = ''
+            else:
+                df_fact['PROVEEDOR'] = raw_prov_lookup
+                df_fact['PROVINCIA_PROV'] = ''
+        else:
+            df_fact['PROVEEDOR'] = raw_prov_lookup
+            df_fact['PROVINCIA_PROV'] = ''
+    else:
+        df_fact['PROVEEDOR'] = ''
+        df_fact['PROVINCIA_PROV'] = ''
+
+    # 4. MAPEO DE FECHAS Y CAMPOS NUMÉRICOS
     df_fact['FECHA_EMISION'] = pd.to_datetime(df_fact[col_fecha], errors='coerce')
     if df_fact['FECHA_EMISION'].dt.tz is not None:
         df_fact['FECHA_EMISION'] = df_fact['FECHA_EMISION'].dt.tz_convert(None)
@@ -659,22 +711,59 @@ def load_all_data():
 
     df_fact['KILOS_SOLICITADOS'] = pd.to_numeric(df_fact[col_cant], errors='coerce').fillna(0)
     df_fact['PRECIO_KG'] = pd.to_numeric(df_fact[col_precio], errors='coerce').fillna(0)
-    df_fact['VALOR_COMERCIAL'] = df_fact['KILOS_SOLICITADOS'] * df_fact['PRECIO_KG']
+    df_fact['COSTO_PROV_UNIT'] = pd.to_numeric(df_fact[col_costo_prov], errors='coerce').fillna(0) if col_costo_prov else 0.0
+    df_fact['COSTO_DEV_UNIT'] = pd.to_numeric(df_fact[col_costo_dev], errors='coerce').fillna(0) if col_costo_dev else 0.0
 
-    # Peso por jaba desde columna PesoJabaKg (respaldo 18.0 kg)
+    # Peso por jaba y conteo de jabas (usa Jabas real si existe, si no Cantidad Total / PesoJabaKg)
     if col_peso_jaba:
         peso_jaba_serie = pd.to_numeric(df_fact[col_peso_jaba], errors='coerce')
         df_fact['PESO_JABA_EFECTIVO'] = np.where(peso_jaba_serie > 0, peso_jaba_serie, DEFAULT_KG_PER_JABA)
     else:
         df_fact['PESO_JABA_EFECTIVO'] = DEFAULT_KG_PER_JABA
 
-    df_fact['JABAS_EST'] = df_fact['KILOS_SOLICITADOS'] / df_fact['PESO_JABA_EFECTIVO']
+    jabas_calc = df_fact['KILOS_SOLICITADOS'] / df_fact['PESO_JABA_EFECTIVO']
+    if col_jabas_real:
+        jabas_list = pd.to_numeric(df_fact[col_jabas_real], errors='coerce')
+        df_fact['JABAS_EST'] = np.where(jabas_list > 0, jabas_list, jabas_calc)
+    else:
+        df_fact['JABAS_EST'] = jabas_calc
+
     df_fact['FRUTOS_EST'] = np.where(df_fact['PESO_FRUTO_KG'].notna(), df_fact['KILOS_SOLICITADOS'] / df_fact['PESO_FRUTO_KG'], 0)
     df_fact['PRECIO_FRUTO_EST'] = df_fact['PRECIO_KG'] * df_fact['PESO_FRUTO_KG']
-
     df_fact['NRO_OC'] = df_fact[col_oc].fillna('').astype(str).str.strip() if col_oc else ''
 
-    # Carga de precios mayoristas locales (reporte_fuerte.xls) para Hoja 2
+    # Cálculos diferenciados por tipo de operación:
+    # - compra/venta: venta = Cantidad Total * Precio OC; costo = Cantidad Total * Costo Proveedor
+    # - devolucion: impacto = Cantidad Total * Costo Proveedor (DEV)
+    es_dev = df_fact['TIPO_NORM'].str.contains('devolucion', na=False)
+    df_fact['ES_DEVOLUCION'] = es_dev
+    df_fact['VALOR_COMERCIAL'] = np.where(~es_dev, df_fact['KILOS_SOLICITADOS'] * df_fact['PRECIO_KG'], 0.0)
+    df_fact['INVERSION_COMPRA'] = np.where(~es_dev, df_fact['KILOS_SOLICITADOS'] * df_fact['COSTO_PROV_UNIT'], 0.0)
+    df_fact['COSTO_DEVOLUCION'] = np.where(es_dev, df_fact['KILOS_SOLICITADOS'] * df_fact['COSTO_DEV_UNIT'], 0.0)
+
+    # 5. PROCESAMIENTO DE factGastos (Fecha, TipoGasto, Descripción, Monto)
+    df_gastos_clean = pd.DataFrame(columns=['FECHA_GASTO', 'AÑO', 'MES_NUM', 'MES_AÑO', 'SEMANA_AÑO', 'TIPO_GASTO', 'DESCRIPCION', 'MONTO'])
+    if not df_gastos.empty:
+        col_g_fecha = find_col(df_gastos, ['Fecha'])
+        col_g_tipo  = find_col(df_gastos, ['TipoGasto', 'Tipo Gasto'])
+        col_g_desc  = find_col(df_gastos, ['Descripción', 'Descripcion', 'Title'])
+        col_g_monto = find_col(df_gastos, ['Monto'])
+        if col_g_fecha and col_g_monto:
+            df_g = df_gastos.copy()
+            df_g['FECHA_GASTO'] = pd.to_datetime(df_g[col_g_fecha], errors='coerce')
+            if df_g['FECHA_GASTO'].dt.tz is not None:
+                df_g['FECHA_GASTO'] = df_g['FECHA_GASTO'].dt.tz_convert(None)
+            df_g = df_g.dropna(subset=['FECHA_GASTO']).copy()
+            df_g['AÑO'] = df_g['FECHA_GASTO'].dt.year
+            df_g['MES_NUM'] = df_g['FECHA_GASTO'].dt.month
+            df_g['MES_AÑO'] = df_g['FECHA_GASTO'].dt.strftime('%Y-%m')
+            df_g['SEMANA_AÑO'] = df_g['FECHA_GASTO'].dt.strftime('%Y-W%V')
+            df_g['TIPO_GASTO'] = df_g[col_g_tipo].fillna('General').astype(str).str.strip() if col_g_tipo else 'General'
+            df_g['DESCRIPCION'] = df_g[col_g_desc].fillna('').astype(str).str.strip() if col_g_desc else ''
+            df_g['MONTO'] = pd.to_numeric(df_g[col_g_monto], errors='coerce').fillna(0.0)
+            df_gastos_clean = df_g[['FECHA_GASTO', 'AÑO', 'MES_NUM', 'MES_AÑO', 'SEMANA_AÑO', 'TIPO_GASTO', 'DESCRIPCION', 'MONTO']].copy()
+
+    # 6. CARGA DE PRECIOS MAYORISTAS LOCALES (reporte_fuerte.xls)
     df_mercado = pd.DataFrame()
     mkt_file = "reporte_fuerte.xls"
     if os.path.exists(mkt_file):
@@ -695,10 +784,10 @@ def load_all_data():
             df_mercado = pd.DataFrame()
 
     timestamp_actualizacion = datetime.now().strftime("%d/%m/%Y %H:%M")
-    return df_fact, df_mercado, timestamp_actualizacion
+    return df_fact, df_gastos_clean, df_mercado, timestamp_actualizacion
 
 try:
-    df_raw, df_mercado_raw, update_time = load_all_data()
+    df_all_raw, df_gastos_raw, df_mercado_raw, update_time = load_all_data()
 except Exception as e:
     st.error(f"Error conectando con Microsoft Lists / SharePoint: {e}")
     st.stop()
@@ -745,17 +834,22 @@ with st.sidebar:
             </script>
         """, height=30)
 
-    # 0. SELECTOR DE PÁGINAS INTEGRADO EN EL PANEL
+    # 0. SELECTOR DE PÁGINAS INTEGRADO EN EL PANEL (4 PÁGINAS)
     vista_activa = st.radio(
         "📑 Navegación",
-        options=["📊 Resumen & Evolución", "🎯 Benchmark & Previsión"],
+        options=[
+            "📊 Resumen & Evolución",
+            "🎯 Benchmark & Previsión",
+            "🚛 Logística & Devoluciones",
+            "💰 Financiero & Márgenes"
+        ],
         label_visibility="collapsed"
     )
     
     st.divider()
 
     # 1. FILTRO DE AÑO
-    años_disponibles = sorted(df_raw['AÑO'].dropna().astype(int).unique().tolist(), reverse=True)
+    años_disponibles = sorted(df_all_raw['AÑO'].dropna().astype(int).unique().tolist(), reverse=True)
     st.markdown('<span class="sb-label">📆 Año Fiscal</span>', unsafe_allow_html=True)
     año_seleccionado = st.selectbox(
         "Año Fiscal",
@@ -764,10 +858,10 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     
-    df_año = df_raw[df_raw['AÑO'] == año_seleccionado]
+    df_año_all = df_all_raw[df_all_raw['AÑO'] == año_seleccionado]
     
     # 2. SLICER DE MESES
-    meses_disp = sorted(df_año['MES_NUM'].dropna().astype(int).unique().tolist())
+    meses_disp = sorted(df_año_all['MES_NUM'].dropna().astype(int).unique().tolist())
     
     if 'sel_meses' not in st.session_state or st.session_state.get('last_year') != año_seleccionado:
         st.session_state.sel_meses = []
@@ -804,7 +898,7 @@ with st.sidebar:
     selected_meses = st.session_state.sel_meses if len(st.session_state.sel_meses) > 0 else meses_disp
 
     # 3. SLICER DE VARIEDAD / CALIBRE
-    prods_reales = sorted(df_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
+    prods_reales = sorted(df_all_raw['DESCRIPCION_PRODUCTO'].dropna().unique().tolist())
     
     if 'sel_prods' not in st.session_state:
         st.session_state.sel_prods = []
@@ -839,8 +933,8 @@ with st.sidebar:
 
     # 4. FILTRO TIPO CALENDARIO
     st.markdown('<span class="sb-label">📅 Rango de Fechas</span>', unsafe_allow_html=True)
-    min_date_año = df_año['FECHA_EMISION'].min().date()
-    max_date_año = df_año['FECHA_EMISION'].max().date()
+    min_date_año = df_año_all['FECHA_EMISION'].min().date()
+    max_date_año = df_año_all['FECHA_EMISION'].max().date()
     
     ver_todo_rango = st.checkbox("Todo el rango del año", value=True)
     if ver_todo_rango:
@@ -867,16 +961,37 @@ with st.sidebar:
 col_periodo = 'MES_AÑO' if periodo_seleccionado == "Mensual" else 'SEMANA_AÑO'
 label_periodo = "Mes" if periodo_seleccionado == "Mensual" else "Semana"
 
-# --- APLICACIÓN DE FILTROS ---
-df = df_año.copy()
-df = df[df['MES_NUM'].isin(selected_meses)]
-df = df[df['DESCRIPCION_PRODUCTO'].isin(selected_prods)]
+# --- APLICACIÓN DE FILTROS GLOBALES ---
+df_all_filtered = df_año_all.copy()
+df_all_filtered = df_all_filtered[df_all_filtered['MES_NUM'].isin(selected_meses)]
+df_all_filtered = df_all_filtered[df_all_filtered['DESCRIPCION_PRODUCTO'].isin(selected_prods)]
 
 if len(date_range) == 2:
-    df = df[(df['FECHA_EMISION'].dt.date >= date_range[0]) & (df['FECHA_EMISION'].dt.date <= date_range[1])]
+    df_all_filtered = df_all_filtered[
+        (df_all_filtered['FECHA_EMISION'].dt.date >= date_range[0]) &
+        (df_all_filtered['FECHA_EMISION'].dt.date <= date_range[1])
+    ]
 
-if df.empty:
-    st.warning("⚠️ No se encontraron órdenes para la combinación de filtros seleccionada.")
+# Subconjuntos diferenciados:
+# - df: solo compra/venta (mantiene intactas las Páginas 1 y 2)
+# - df_dev: solo devoluciones
+df = df_all_filtered[~df_all_filtered['ES_DEVOLUCION']].copy()
+df_dev = df_all_filtered[df_all_filtered['ES_DEVOLUCION']].copy()
+
+# Filtrar también factGastos con los mismos criterios temporales
+df_gastos_filtered = pd.DataFrame(columns=df_gastos_raw.columns)
+if not df_gastos_raw.empty:
+    df_g_tmp = df_gastos_raw[df_gastos_raw['AÑO'] == año_seleccionado].copy()
+    df_g_tmp = df_g_tmp[df_g_tmp['MES_NUM'].isin(selected_meses)]
+    if len(date_range) == 2:
+        df_g_tmp = df_g_tmp[
+            (df_g_tmp['FECHA_GASTO'].dt.date >= date_range[0]) &
+            (df_g_tmp['FECHA_GASTO'].dt.date <= date_range[1])
+        ]
+    df_gastos_filtered = df_g_tmp
+
+if df_all_filtered.empty:
+    st.warning("⚠️ No se encontraron registros para la combinación de filtros seleccionada.")
     st.stop()
 
 if periodo_seleccionado == "Semanal":
@@ -895,66 +1010,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- KPIS DE ALTO IMPACTO ---
-total_kg = df['KILOS_SOLICITADOS'].sum()
-valor_comercial_total = df['VALOR_COMERCIAL'].sum()
-precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
-total_ocs = df['NRO_OC'].nunique()
-kg_promedio_oc = total_kg / total_ocs if total_ocs > 0 else 0
-total_jabas_est = df['JABAS_EST'].sum()
-peso_jaba_prom = df['PESO_JABA_EFECTIVO'].mean() if not df.empty else DEFAULT_KG_PER_JABA
-
-disp_facturacion = "S/ ••••••" if ocultar_precios else f"S/ {valor_comercial_total:,.0f}"
-disp_fact_sub = "Dato reservado" if ocultar_precios else "Venta total pactada"
-disp_precio = "S/ •.••" if ocultar_precios else f"S/ {precio_ponderado_total:.2f}"
-disp_precio_sub = "Dato reservado" if ocultar_precios else "Por kg promedio"
-
-st.markdown(f"""
-    <div class="kpi-grid">
-        <div class="kpi-card kpi-volumen">
-            <div class="kpi-top">
-                <span class="kpi-title">Volumen Solicitado</span>
-                <span class="kpi-badge">📦 Kg</span>
-            </div>
-            <div class="kpi-value">{total_kg:,.0f} kg</div>
-            <div class="kpi-sub">Total: <b>{total_kg/1000:,.1f} Tn</b></div>
-        </div>
-        <div class="kpi-card kpi-venta">
-            <div class="kpi-top">
-                <span class="kpi-title">Facturación Bruta</span>
-                <span class="kpi-badge">💰 PEN</span>
-            </div>
-            <div class="kpi-value">{disp_facturacion}</div>
-            <div class="kpi-sub">{disp_fact_sub}</div>
-        </div>
-        <div class="kpi-card kpi-precio">
-            <div class="kpi-top">
-                <span class="kpi-title">Precio Ponderado</span>
-                <span class="kpi-badge">🏷️ Margen</span>
-            </div>
-            <div class="kpi-value">{disp_precio}</div>
-            <div class="kpi-sub">{disp_precio_sub}</div>
-        </div>
-        <div class="kpi-card kpi-ordenes">
-            <div class="kpi-top">
-                <span class="kpi-title">Órdenes Despachadas</span>
-                <span class="kpi-badge">📋 OCs</span>
-            </div>
-            <div class="kpi-value">{total_ocs:,}</div>
-            <div class="kpi-sub">Promedio: <b>{kg_promedio_oc:,.0f} kg/OC</b></div>
-        </div>
-        <div class="kpi-card kpi-jabas">
-            <div class="kpi-top">
-                <span class="kpi-title">Jabas Estimadas</span>
-                <span class="kpi-badge">🚛 Logística</span>
-            </div>
-            <div class="kpi-value">{total_jabas_est:,.0f}</div>
-            <div class="kpi-sub">Ratio: {peso_jaba_prom:.0f} kg / jaba</div>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
-
-# --- FRAGMENTO INTERACTIVO PARA TRANSICIÓN FLUIDA ENTRE MESES Y SEMANAS ---
+# --- FRAGMENTO INTERACTIVO PARA TRANSICIÓN FLUIDA ENTRE MESES Y SEMANAS (PÁGINA 1) ---
 @st.fragment
 def render_evolucion_interactiva(df_base, periodo_sel, año_sel, ocultar_p, col_per, label_per):
     es_vista_mensual = (periodo_sel == "Mensual")
@@ -1003,7 +1059,6 @@ def render_evolucion_interactiva(df_base, periodo_sel, año_sel, ocultar_p, col_
             semanas_visibles = df_trend[col_actual].tolist()
             df_detalle_grafico = df_detalle_grafico[df_detalle_grafico['SEMANA_AÑO'].isin(semanas_visibles)].copy()
 
-    # 1. GRÁFICO SUPERIOR: EVOLUCIÓN CON ÁREA SOMBREADA SUTIL DE DEMANDA MERCADO
     st.markdown(f'<div class="chart-header">📈 {titulo_grafico}</div>', unsafe_allow_html=True)
     fig_dual = go.Figure()
 
@@ -1143,7 +1198,6 @@ def render_evolucion_interactiva(df_base, periodo_sel, año_sel, ocultar_p, col_
     chart_key = "grafico_mensual_click" if not mes_en_drilldown else f"grafico_semanal_{mes_en_drilldown}"
     chart_event = st.plotly_chart(fig_dual, use_container_width=True, config=PLOTLY_CONFIG, key=chart_key, on_select="rerun", selection_mode="points")
 
-    # PROCESAMIENTO DE CLIC EN EL GRÁFICO DENTRO DEL FRAGMENTO
     if es_vista_mensual and not mes_en_drilldown:
         st.session_state.semana_seleccionada = None
         if chart_event:
@@ -1185,7 +1239,6 @@ def render_evolucion_interactiva(df_base, periodo_sel, año_sel, ocultar_p, col_
         st.session_state.semana_seleccionada = None
         etiqueta_filtro_tabla = f"Mes {mes_en_drilldown}" if mes_en_drilldown else f"Vista {periodo_sel}"
 
-    # PESTAÑA DESPLEGABLE: SOLO CON FECHA Y MÉTRICAS RELEVANTES (SIN MES NI SEMANA REDUNDANTES)
     with st.expander("📋 Ver detalle de órdenes filtradas", expanded=False):
         st.caption(f"Filtro activo: **{etiqueta_filtro_tabla}** — **{len(df_detalle_grafico):,}** registros")
         df_tabla_det = df_detalle_grafico.sort_values(by=['FECHA_EMISION', 'NRO_OC'], ascending=[False, False]).copy()
@@ -1230,7 +1283,6 @@ def render_evolucion_interactiva(df_base, periodo_sel, año_sel, ocultar_p, col_
                 use_container_width=True, height=220, hide_index=True
             )
 
-    # INSIGHT 1: EVOLUCIÓN Y CONTRASTE CON ESTACIONALIDAD DE MERCADO
     max_vol_row = df_trend.loc[df_trend['KG_TOTALES'].idxmax()]
     max_p_row = df_trend.loc[df_trend['PRECIO_POND'].idxmax()]
     var_p_txt = f"({max_p_row['VAR_PRECIO_PCT']:+.1f}% vs periodo previo)" if pd.notna(max_p_row['VAR_PRECIO_PCT']) else ""
@@ -1259,7 +1311,68 @@ def render_evolucion_interactiva(df_base, periodo_sel, año_sel, ocultar_p, col_
 # HOJA 1: RESUMEN EJECUTIVO & EVOLUCIÓN
 # ==========================================================
 if vista_activa == "📊 Resumen & Evolución":
-    
+    if df.empty:
+        st.warning("⚠️ No se encontraron órdenes de compra/venta para los filtros seleccionados.")
+        st.stop()
+
+    total_kg = df['KILOS_SOLICITADOS'].sum()
+    valor_comercial_total = df['VALOR_COMERCIAL'].sum()
+    precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
+    total_ocs = df['NRO_OC'].nunique()
+    kg_promedio_oc = total_kg / total_ocs if total_ocs > 0 else 0
+    total_jabas_est = df['JABAS_EST'].sum()
+    peso_jaba_prom = df['PESO_JABA_EFECTIVO'].mean() if not df.empty else DEFAULT_KG_PER_JABA
+
+    disp_facturacion = "S/ ••••••" if ocultar_precios else f"S/ {valor_comercial_total:,.0f}"
+    disp_fact_sub = "Dato reservado" if ocultar_precios else "Venta total pactada"
+    disp_precio = "S/ •.••" if ocultar_precios else f"S/ {precio_ponderado_total:.2f}"
+    disp_precio_sub = "Dato reservado" if ocultar_precios else "Por kg promedio"
+
+    st.markdown(f"""
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-volumen">
+                <div class="kpi-top">
+                    <span class="kpi-title">Volumen Solicitado</span>
+                    <span class="kpi-badge">📦 Kg</span>
+                </div>
+                <div class="kpi-value">{total_kg:,.0f} kg</div>
+                <div class="kpi-sub">Total: <b>{total_kg/1000:,.1f} Tn</b></div>
+            </div>
+            <div class="kpi-card kpi-venta">
+                <div class="kpi-top">
+                    <span class="kpi-title">Facturación Bruta</span>
+                    <span class="kpi-badge">💰 PEN</span>
+                </div>
+                <div class="kpi-value">{disp_facturacion}</div>
+                <div class="kpi-sub">{disp_fact_sub}</div>
+            </div>
+            <div class="kpi-card kpi-precio">
+                <div class="kpi-top">
+                    <span class="kpi-title">Precio Ponderado</span>
+                    <span class="kpi-badge">🏷️ Margen</span>
+                </div>
+                <div class="kpi-value">{disp_precio}</div>
+                <div class="kpi-sub">{disp_precio_sub}</div>
+            </div>
+            <div class="kpi-card kpi-ordenes">
+                <div class="kpi-top">
+                    <span class="kpi-title">Órdenes Despachadas</span>
+                    <span class="kpi-badge">📋 OCs</span>
+                </div>
+                <div class="kpi-value">{total_ocs:,}</div>
+                <div class="kpi-sub">Promedio: <b>{kg_promedio_oc:,.0f} kg/OC</b></div>
+            </div>
+            <div class="kpi-card kpi-jabas">
+                <div class="kpi-top">
+                    <span class="kpi-title">Jabas Estimadas</span>
+                    <span class="kpi-badge">🚛 Logística</span>
+                </div>
+                <div class="kpi-value">{total_jabas_est:,.0f}</div>
+                <div class="kpi-sub">Ratio: {peso_jaba_prom:.0f} kg / jaba</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
     render_evolucion_interactiva(df, periodo_seleccionado, año_seleccionado, ocultar_precios, col_periodo, label_periodo)
 
     df_trend_base = df.groupby(col_periodo).agg(
@@ -1272,7 +1385,6 @@ if vista_activa == "📊 Resumen & Evolución":
     df_trend_base['VAR_PRECIO_PCT'] = df_trend_base['PRECIO_POND'].pct_change() * 100
     df_trend_base['VAR_VALOR_PCT'] = df_trend_base['VALOR_TOTAL'].pct_change() * 100
 
-    # 2. FILA INFERIOR: MIX + MATRIZ
     col_mix, col_matriz = st.columns([1, 1.35])
     
     with col_mix:
@@ -1374,7 +1486,69 @@ if vista_activa == "📊 Resumen & Evolución":
 # ==========================================================
 # HOJA 2: BENCHMARK & PREVISIÓN
 # ==========================================================
-else:
+elif vista_activa == "🎯 Benchmark & Previsión":
+    if df.empty:
+        st.warning("⚠️ No se encontraron órdenes de compra/venta para los filtros seleccionados.")
+        st.stop()
+
+    total_kg = df['KILOS_SOLICITADOS'].sum()
+    valor_comercial_total = df['VALOR_COMERCIAL'].sum()
+    precio_ponderado_total = valor_comercial_total / total_kg if total_kg > 0 else 0
+    total_ocs = df['NRO_OC'].nunique()
+    kg_promedio_oc = total_kg / total_ocs if total_ocs > 0 else 0
+    total_jabas_est = df['JABAS_EST'].sum()
+    peso_jaba_prom = df['PESO_JABA_EFECTIVO'].mean() if not df.empty else DEFAULT_KG_PER_JABA
+
+    disp_facturacion = "S/ ••••••" if ocultar_precios else f"S/ {valor_comercial_total:,.0f}"
+    disp_fact_sub = "Dato reservado" if ocultar_precios else "Venta total pactada"
+    disp_precio = "S/ •.••" if ocultar_precios else f"S/ {precio_ponderado_total:.2f}"
+    disp_precio_sub = "Dato reservado" if ocultar_precios else "Por kg promedio"
+
+    st.markdown(f"""
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-volumen">
+                <div class="kpi-top">
+                    <span class="kpi-title">Volumen Solicitado</span>
+                    <span class="kpi-badge">📦 Kg</span>
+                </div>
+                <div class="kpi-value">{total_kg:,.0f} kg</div>
+                <div class="kpi-sub">Total: <b>{total_kg/1000:,.1f} Tn</b></div>
+            </div>
+            <div class="kpi-card kpi-venta">
+                <div class="kpi-top">
+                    <span class="kpi-title">Facturación Bruta</span>
+                    <span class="kpi-badge">💰 PEN</span>
+                </div>
+                <div class="kpi-value">{disp_facturacion}</div>
+                <div class="kpi-sub">{disp_fact_sub}</div>
+            </div>
+            <div class="kpi-card kpi-precio">
+                <div class="kpi-top">
+                    <span class="kpi-title">Precio Ponderado</span>
+                    <span class="kpi-badge">🏷️ Margen</span>
+                </div>
+                <div class="kpi-value">{disp_precio}</div>
+                <div class="kpi-sub">{disp_precio_sub}</div>
+            </div>
+            <div class="kpi-card kpi-ordenes">
+                <div class="kpi-top">
+                    <span class="kpi-title">Órdenes Despachadas</span>
+                    <span class="kpi-badge">📋 OCs</span>
+                </div>
+                <div class="kpi-value">{total_ocs:,}</div>
+                <div class="kpi-sub">Promedio: <b>{kg_promedio_oc:,.0f} kg/OC</b></div>
+            </div>
+            <div class="kpi-card kpi-jabas">
+                <div class="kpi-top">
+                    <span class="kpi-title">Jabas Estimadas</span>
+                    <span class="kpi-badge">🚛 Logística</span>
+                </div>
+                <div class="kpi-value">{total_jabas_est:,.0f}</div>
+                <div class="kpi-sub">Ratio: {peso_jaba_prom:.0f} kg / jaba</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
     if ocultar_precios:
         st.info("🔒 **Modo Presentación Activo:** Los comparativos de precios mayoristas, márgenes y bandas de negociación están ocultos. Desactiva el modo en el panel lateral para visualizar esta sección.")
     else:
@@ -1389,7 +1563,7 @@ else:
             mkt_2025 = [mkt_mensual[2025].get(i, np.nan) if 2025 in mkt_mensual else np.nan for i in range(1, 13)]
             mkt_2026_real = [mkt_mensual[2026].get(i, np.nan) if 2026 in mkt_mensual else np.nan for i in range(1, 13)]
             
-            df_kco = df_raw[df_raw['AÑO'] == año_seleccionado].copy()
+            df_kco = df_all_raw[(df_all_raw['AÑO'] == año_seleccionado) & (~df_all_raw['ES_DEVOLUCION'])].copy()
             df_kco['MES'] = df_kco['FECHA_EMISION'].dt.month
             kco_mensual = df_kco.groupby('MES').agg(
                 KILOS=('KILOS_SOLICITADOS', 'sum'),
@@ -1413,7 +1587,6 @@ else:
             text_mkt_intercalado = [f"<b>S/{val:.2f}</b>" if (pd.notna(val) and ((idx+1)%2 != 0 or (idx+1)==11)) else "" for idx, val in enumerate(mkt_2026_real[:11])]
             text_kco_intercalado = [f"<b>S/{val:.2f}</b>" if (pd.notna(val) and ((idx+1)%2 == 0 or (idx+1)==11)) else "" for idx, val in enumerate(kco_2026_real[:11])]
 
-            # 1. GRÁFICO BENCHMARK ANUAL
             st.markdown('<div class="chart-header">🎯 Comparativo Anual de Precios: Mayorista vs KCO Retail & Previsión a Diciembre</div>', unsafe_allow_html=True)
             fig_anual = go.Figure()
 
@@ -1458,7 +1631,6 @@ else:
             )
             st.plotly_chart(fig_anual, use_container_width=True, config=PLOTLY_CONFIG)
 
-            # 2. PREVISIONES EJECUTIVAS
             c_p1, c_p2, c_p3 = st.columns(3)
             with c_p1:
                 st.markdown(f'<div class="kpi-card kpi-ordenes"><div class="kpi-title">Mayorista (Nov Real ➔ Dic Proy)</div><div class="kpi-value" style="font-size:16px;">S/ {mkt_nov_val:.2f} ➔ S/ {mkt_dic_pred:.2f}</div><div class="kpi-sub">Ajuste estacional (-20.1%)</div></div>', unsafe_allow_html=True)
@@ -1474,7 +1646,6 @@ else:
                 </div>
             """, unsafe_allow_html=True)
 
-            # 3. BANDA DE PRECIOS Y VARIACIONES
             col_b1, col_b2 = st.columns([1.1, 1.4])
             with col_b1:
                 st.markdown('<div class="chart-header">🎯 Banda de Negociación por Variedad</div>', unsafe_allow_html=True)
@@ -1531,7 +1702,6 @@ else:
                     </div>
                 """, unsafe_allow_html=True)
 
-            # 4. MATRIZ DE HISTORIAL DE CAMBIOS DE PRECIO EN EXPANDER
             with st.expander("📋 Ver Matriz Histórica de Cambios de Precio"):
                 if not df_changes.empty:
                     tbl_c = df_changes[[col_periodo, 'DESCRIPCION_PRODUCTO', 'PRECIO_PREV', 'PRECIO_POND', 'DIF_SOLES', 'VAR_PRECIO_PCT', 'KG']].copy()
@@ -1549,3 +1719,488 @@ else:
                     )
                 else:
                     st.info("No hay variaciones de precios registradas en el rango seleccionado.")
+
+# ==========================================================
+# HOJA 3: LOGÍSTICA & DEVOLUCIONES
+# ==========================================================
+elif vista_activa == "🚛 Logística & Devoluciones":
+    jabas_despachadas = df['JABAS_EST'].sum()
+    kg_despachados = df['KILOS_SOLICITADOS'].sum()
+    inversion_total = df['INVERSION_COMPRA'].sum()
+    costo_compra_prom = inversion_total / kg_despachados if kg_despachados > 0 else 0
+
+    kg_devueltos = df_dev['KILOS_SOLICITADOS'].sum()
+    jabas_devueltas = df_dev['JABAS_EST'].sum()
+    costo_dev_total = df_dev['COSTO_DEVOLUCION'].sum()
+    tasa_dev_pct = (kg_devueltos / kg_despachados * 100) if kg_despachados > 0 else 0.0
+
+    disp_inv = "S/ ••••••" if ocultar_precios else f"S/ {inversion_total:,.0f}"
+    disp_costo_u = "S/ •.•• /kg" if ocultar_precios else f"S/ {costo_compra_prom:.2f} /kg"
+    disp_dev_costo = "Dato reservado" if ocultar_precios else f"Impacto: S/ {costo_dev_total:,.0f}"
+
+    st.markdown(f"""
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-jabas">
+                <div class="kpi-top">
+                    <span class="kpi-title">Jabas Despachadas</span>
+                    <span class="kpi-badge">📦 Carga</span>
+                </div>
+                <div class="kpi-value">{jabas_despachadas:,.0f}</div>
+                <div class="kpi-sub">Volumen: <b>{kg_despachados:,.0f} kg</b></div>
+            </div>
+            <div class="kpi-card kpi-venta">
+                <div class="kpi-top">
+                    <span class="kpi-title">Inversión en Compra</span>
+                    <span class="kpi-badge">💵 Capital</span>
+                </div>
+                <div class="kpi-value">{disp_inv}</div>
+                <div class="kpi-sub">Compra directa proveedor</div>
+            </div>
+            <div class="kpi-card kpi-precio">
+                <div class="kpi-top">
+                    <span class="kpi-title">Costo Prom. Compra</span>
+                    <span class="kpi-badge">⚖️ Unitario</span>
+                </div>
+                <div class="kpi-value">{disp_costo_u}</div>
+                <div class="kpi-sub">Ponderado por kg</div>
+            </div>
+            <div class="kpi-card kpi-danger">
+                <div class="kpi-top">
+                    <span class="kpi-title">Volumen Devuelto</span>
+                    <span class="kpi-badge">↩️ Merma</span>
+                </div>
+                <div class="kpi-value">{kg_devueltos:,.0f} kg</div>
+                <div class="kpi-sub">Equiv: <b>{jabas_devueltas:,.1f} jabas</b></div>
+            </div>
+            <div class="kpi-card kpi-ordenes">
+                <div class="kpi-top">
+                    <span class="kpi-title">Tasa de Devolución</span>
+                    <span class="kpi-badge">📉 Calidad</span>
+                </div>
+                <div class="kpi-value">{tasa_dev_pct:.2f}%</div>
+                <div class="kpi-sub">{disp_dev_costo}</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 1. GRÁFICO SUPERIOR: CONTROL LOGÍSTICO DE JABAS POR SEMANA (APILADO POR PRODUCTO)
+    st.markdown('<div class="chart-header">🚛 Control Logístico: Jabas Despachadas por Semana y Variedad</div>', unsafe_allow_html=True)
+    if not df.empty:
+        df_jabas_sem = df.groupby(['SEMANA_AÑO', 'DESCRIPCION_PRODUCTO']).agg(
+            JABAS=('JABAS_EST', 'sum'),
+            KG=('KILOS_SOLICITADOS', 'sum')
+        ).reset_index().sort_values('SEMANA_AÑO')
+
+        semanas_unicas = sorted(df_jabas_sem['SEMANA_AÑO'].unique().tolist())
+        if len(semanas_unicas) > 24:
+            semanas_vis = semanas_unicas[-24:]
+            df_jabas_sem = df_jabas_sem[df_jabas_sem['SEMANA_AÑO'].isin(semanas_vis)]
+
+        tot_sem = df_jabas_sem.groupby('SEMANA_AÑO')['JABAS'].sum().reset_index()
+        prom_jabas_sem = tot_sem['JABAS'].mean()
+
+        fig_jabas = px.bar(
+            df_jabas_sem,
+            x='SEMANA_AÑO',
+            y='JABAS',
+            color='DESCRIPCION_PRODUCTO',
+            color_discrete_map=VARIEDAD_COLORS,
+            custom_data=['KG']
+        )
+        fig_jabas.update_traces(
+            hovertemplate="<b>%{x}</b><br>Producto: %{fullData.name}<br>Jabas: %{y:,.1f}<br>Kilos: %{customdata[0]:,.0f} kg<extra></extra>"
+        )
+        fig_jabas.add_trace(go.Scatter(
+            x=tot_sem['SEMANA_AÑO'],
+            y=tot_sem['JABAS'],
+            mode='text',
+            text=tot_sem['JABAS'].apply(lambda x: f"<b>{x:,.0f}</b>"),
+            textposition='top center',
+            textfont=dict(color='#0f172a', size=8.5),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
+        fig_jabas.add_hline(
+            y=prom_jabas_sem,
+            line_dash="dot",
+            line_color="#d97706",
+            annotation_text=f"Prom: {prom_jabas_sem:,.0f} jabas/sem",
+            annotation_position="top left",
+            annotation_font=dict(size=9, color="#b45309")
+        )
+        fig_jabas.update_layout(
+            barmode='stack',
+            autosize=True,
+            template='plotly_white',
+            height=245,
+            xaxis=dict(title='', tickangle=-30, tickfont=dict(size=8.5)),
+            yaxis=dict(title='Jabas Despachadas', titlefont=dict(size=9), tickfont=dict(size=8.5)),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title='', font=dict(size=8.5)),
+            margin=dict(t=22, b=28, l=8, r=8)
+        )
+        st.plotly_chart(fig_jabas, use_container_width=True, config=PLOTLY_CONFIG)
+
+        pico_sem = tot_sem.loc[tot_sem['JABAS'].idxmax()]
+        st.markdown(f"""
+            <div class="chart-insight">
+                <div class="insight-title">📦 Ritmo de Despacho Semanal:</div>
+                El flujo logístico promedio es de <b>{prom_jabas_sem:,.0f} jabas por semana</b>, alcanzando su pico máximo en <b>{pico_sem['SEMANA_AÑO']}</b> con <b>{pico_sem['JABAS']:,.0f} jabas</b> movilizadas.
+            </div>
+        """, unsafe_allow_html=True)
+
+    # 2. FILA INFERIOR: INVERSIÓN POR PRODUCTO + CONTROL DE DEVOLUCIONES
+    col_inv, col_dev = st.columns([1.05, 1.35])
+
+    with col_inv:
+        st.markdown('<div class="chart-header">💵 Inversión en Compra por Producto</div>', unsafe_allow_html=True)
+        df_inv_prod = df.groupby('DESCRIPCION_PRODUCTO').agg(
+            INVERSION=('INVERSION_COMPRA', 'sum'),
+            KG=('KILOS_SOLICITADOS', 'sum'),
+            JABAS=('JABAS_EST', 'sum')
+        ).reset_index()
+        df_inv_prod['COSTO_UNIT'] = np.where(df_inv_prod['KG'] > 0, df_inv_prod['INVERSION'] / df_inv_prod['KG'], 0)
+        df_inv_prod = df_inv_prod.sort_values(by='JABAS' if ocultar_precios else 'INVERSION', ascending=True)
+
+        if ocultar_precios:
+            fig_inv = go.Figure(go.Bar(
+                x=df_inv_prod['JABAS'],
+                y=df_inv_prod['DESCRIPCION_PRODUCTO'],
+                orientation='h',
+                marker_color=[VARIEDAD_COLORS.get(p, COLOR_PRIMARY) for p in df_inv_prod['DESCRIPCION_PRODUCTO']],
+                text=df_inv_prod['JABAS'].apply(lambda x: f"<b>{x:,.0f} jabas</b>"),
+                textposition='outside',
+                cliponaxis=False
+            ))
+            fig_inv.update_layout(
+                autosize=True, template='plotly_white', height=225,
+                xaxis=dict(title='Jabas', tickfont=dict(size=8.5)),
+                yaxis=dict(title='', tickfont=dict(size=8.5)),
+                margin=dict(t=10, b=20, l=8, r=55)
+            )
+            st.plotly_chart(fig_inv, use_container_width=True, config=PLOTLY_CONFIG)
+        else:
+            fig_inv = go.Figure(go.Bar(
+                x=df_inv_prod['INVERSION'],
+                y=df_inv_prod['DESCRIPCION_PRODUCTO'],
+                orientation='h',
+                marker_color=[VARIEDAD_COLORS.get(p, COLOR_PRIMARY) for p in df_inv_prod['DESCRIPCION_PRODUCTO']],
+                text=df_inv_prod.apply(lambda r: f"<b>S/ {r['INVERSION']:,.0f}</b> (S/{r['COSTO_UNIT']:.2f}/kg)", axis=1),
+                textposition='outside',
+                cliponaxis=False,
+                textfont=dict(size=8.5, color='#0f172a'),
+                hovertemplate="<b>%{y}</b><br>Inversión: S/ %{x:,.2f}<br>Jabas: %{customdata[0]:,.0f}<br>Kilos: %{customdata[1]:,.0f} kg<extra></extra>",
+                customdata=np.stack((df_inv_prod['JABAS'], df_inv_prod['KG']), axis=-1)
+            ))
+            fig_inv.update_layout(
+                autosize=True, template='plotly_white', height=225,
+                xaxis=dict(title='Inversión (S/)', tickfont=dict(size=8.5)),
+                yaxis=dict(title='', tickfont=dict(size=8.5)),
+                margin=dict(t=10, b=20, l=8, r=95)
+            )
+            st.plotly_chart(fig_inv, use_container_width=True, config=PLOTLY_CONFIG)
+
+        top_inv = df_inv_prod.iloc[-1]
+        part_inv = (top_inv['INVERSION'] / inversion_total * 100) if inversion_total > 0 else 0
+        txt_inv_ins = (
+            f"El calibre <b>{top_inv['DESCRIPCION_PRODUCTO']}</b> concentra el mayor movimiento físico con <b>{top_inv['JABAS']:,.0f} jabas</b>."
+            if ocultar_precios else
+            f"<b>{top_inv['DESCRIPCION_PRODUCTO']}</b> absorbe el <b>{part_inv:.1f}%</b> del capital invertido (<b>S/ {top_inv['INVERSION']:,.0f}</b>) a un costo promedio de <b>S/ {top_inv['COSTO_UNIT']:.2f}/kg</b>."
+        )
+        st.markdown(f"""
+            <div class="chart-insight" style="margin-top: 4px;">
+                <div class="insight-title">💼 Asignación de Capital por Calibre:</div>
+                {txt_inv_ins}
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col_dev:
+        st.markdown('<div class="chart-header">↩️ Control de Devoluciones (Por Producto y Proveedor)</div>', unsafe_allow_html=True)
+        if df_dev.empty:
+            st.success("✅ No se registran devoluciones en el rango y filtros seleccionados.")
+            st.markdown("""
+                <div class="chart-insight" style="margin-top: 4px;">
+                    <div class="insight-title">🛡️ Calidad de Entrega:</div>
+                    0% de merma por devoluciones en el periodo analizado.
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            df_dev_grp = df_dev.groupby(['DESCRIPCION_PRODUCTO', 'PROVEEDOR']).agg(
+                KG_DEV=('KILOS_SOLICITADOS', 'sum'),
+                JABAS_DEV=('JABAS_EST', 'sum'),
+                COSTO_DEV=('COSTO_DEVOLUCION', 'sum'),
+                DOCS=('NRO_OC', 'count')
+            ).reset_index().sort_values(by='COSTO_DEV' if not ocultar_precios else 'KG_DEV', ascending=False)
+
+            if ocultar_precios:
+                tbl_dev = df_dev_grp[['DESCRIPCION_PRODUCTO', 'PROVEEDOR', 'KG_DEV', 'JABAS_DEV', 'DOCS']].copy()
+                tbl_dev.columns = ['Producto', 'Proveedor', 'Kg Devueltos', 'Jabas Dev.', 'Registros']
+                st.dataframe(
+                    tbl_dev.style.format({'Kg Devueltos': '{:,.0f}', 'Jabas Dev.': '{:,.1f}', 'Registros': '{:,}'}),
+                    use_container_width=True, height=225, hide_index=True
+                )
+            else:
+                tbl_dev = df_dev_grp[['DESCRIPCION_PRODUCTO', 'PROVEEDOR', 'KG_DEV', 'JABAS_DEV', 'COSTO_DEV']].copy()
+                tbl_dev.columns = ['Producto', 'Proveedor', 'Kg Devueltos', 'Jabas Dev.', 'Costo DEV (S/)']
+                st.dataframe(
+                    tbl_dev.style.format({'Kg Devueltos': '{:,.0f}', 'Jabas Dev.': '{:,.1f}', 'Costo DEV (S/)': 'S/ {:,.2f}'}),
+                    use_container_width=True, height=225, hide_index=True
+                )
+
+            peor_dev = df_dev_grp.iloc[0]
+            txt_dev_ins = (
+                f"Mayor incidencia en <b>{peor_dev['DESCRIPCION_PRODUCTO']}</b> (Proveedor: <b>{peor_dev['PROVEEDOR'] or 'N/E'}</b>) con <b>{peor_dev['KG_DEV']:,.0f} kg</b> devueltos."
+                if ocultar_precios else
+                f"Mayor impacto en <b>{peor_dev['DESCRIPCION_PRODUCTO']}</b> (Proveedor: <b>{peor_dev['PROVEEDOR'] or 'N/E'}</b>) con <b>{peor_dev['KG_DEV']:,.0f} kg</b> y un costo asumido de <b>S/ {peor_dev['COSTO_DEV']:,.2f}</b>."
+            )
+            st.markdown(f"""
+                <div class="chart-insight" style="margin-top: 4px;">
+                    <div class="insight-title">⚠️ Foco de Devoluciones:</div>
+                    {txt_dev_ins}
+                </div>
+            """, unsafe_allow_html=True)
+
+    # 3. EXPANDER DE DETALLE DE DEVOLUCIONES
+    if not df_dev.empty:
+        with st.expander("📋 Ver detalle línea por línea de devoluciones", expanded=False):
+            df_dev_det = df_dev.sort_values('FECHA_EMISION', ascending=False).copy()
+            df_dev_det['FECHA_STR'] = df_dev_det['FECHA_EMISION'].dt.strftime('%d/%m/%Y')
+            if ocultar_precios:
+                d_show = df_dev_det[['FECHA_STR', 'NRO_OC', 'CLIENTE', 'PROVEEDOR', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'JABAS_EST']].copy()
+                d_show.columns = ['Fecha', 'N° OC', 'Cliente', 'Proveedor', 'Producto', 'Kilos Dev.', 'Jabas']
+                st.dataframe(d_show.style.format({'Kilos Dev.': '{:,.0f}', 'Jabas': '{:,.1f}'}), use_container_width=True, height=200, hide_index=True)
+            else:
+                d_show = df_dev_det[['FECHA_STR', 'NRO_OC', 'CLIENTE', 'PROVEEDOR', 'DESCRIPCION_PRODUCTO', 'KILOS_SOLICITADOS', 'COSTO_DEV_UNIT', 'COSTO_DEVOLUCION']].copy()
+                d_show.columns = ['Fecha', 'N° OC', 'Cliente', 'Proveedor', 'Producto', 'Kilos Dev.', 'Costo Unit. DEV', 'Costo Total DEV']
+                st.dataframe(d_show.style.format({'Kilos Dev.': '{:,.0f}', 'Costo Unit. DEV': 'S/ {:.2f}', 'Costo Total DEV': 'S/ {:,.2f}'}), use_container_width=True, height=200, hide_index=True)
+
+# ==========================================================
+# HOJA 4: FINANCIERO & MÁRGENES
+# ==========================================================
+else:
+    if ocultar_precios:
+        st.info("🔒 **Modo Presentación Activo:** Los estados de resultados, cascada de utilidad, márgenes y costos están ocultos. Desactiva el modo en el panel lateral para visualizar esta sección.")
+    else:
+        venta_bruta = df['VALOR_COMERCIAL'].sum()
+        costo_mercaderia = df['INVERSION_COMPRA'].sum()
+        impacto_devoluciones = df_dev['COSTO_DEVOLUCION'].sum()
+        gastos_operativos = df_gastos_filtered['MONTO'].sum() if not df_gastos_filtered.empty else 0.0
+
+        utilidad_bruta_fruta = venta_bruta - costo_mercaderia - impacto_devoluciones
+        utilidad_neta = utilidad_bruta_fruta - gastos_operativos
+        margen_neto_pct = (utilidad_neta / venta_bruta * 100) if venta_bruta > 0 else 0.0
+        margen_bruto_pct = (utilidad_bruta_fruta / venta_bruta * 100) if venta_bruta > 0 else 0.0
+
+        st.markdown(f"""
+            <div class="kpi-grid">
+                <div class="kpi-card kpi-venta">
+                    <div class="kpi-top">
+                        <span class="kpi-title">Venta Bruta</span>
+                        <span class="kpi-badge">💰 Ingreso</span>
+                    </div>
+                    <div class="kpi-value">S/ {venta_bruta:,.0f}</div>
+                    <div class="kpi-sub">100.0% facturación</div>
+                </div>
+                <div class="kpi-card kpi-precio">
+                    <div class="kpi-top">
+                        <span class="kpi-title">Costo Proveedor</span>
+                        <span class="kpi-badge">🌱 COGS</span>
+                    </div>
+                    <div class="kpi-value">S/ {costo_mercaderia:,.0f}</div>
+                    <div class="kpi-sub">{(costo_mercaderia/venta_bruta*100 if venta_bruta>0 else 0):.1f}% de la venta</div>
+                </div>
+                <div class="kpi-card kpi-danger">
+                    <div class="kpi-top">
+                        <span class="kpi-title">Devoluciones (DEV)</span>
+                        <span class="kpi-badge">↩️ Pérdida</span>
+                    </div>
+                    <div class="kpi-value">S/ {impacto_devoluciones:,.0f}</div>
+                    <div class="kpi-sub">{(impacto_devoluciones/venta_bruta*100 if venta_bruta>0 else 0):.2f}% de la venta</div>
+                </div>
+                <div class="kpi-card kpi-ordenes">
+                    <div class="kpi-top">
+                        <span class="kpi-title">Gastos Operativos</span>
+                        <span class="kpi-badge">🧾 OpEx</span>
+                    </div>
+                    <div class="kpi-value">S/ {gastos_operativos:,.0f}</div>
+                    <div class="kpi-sub">Lista factGastos</div>
+                </div>
+                <div class="kpi-card kpi-volumen">
+                    <div class="kpi-top">
+                        <span class="kpi-title">Utilidad Neta</span>
+                        <span class="kpi-badge">📈 {margen_neto_pct:.1f}%</span>
+                    </div>
+                    <div class="kpi-value">S/ {utilidad_neta:,.0f}</div>
+                    <div class="kpi-sub">Margen Fruta: <b>{margen_bruto_pct:.1f}%</b></div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # 1. FILA SUPERIOR: GRÁFICO DE CASCADA (WATERFALL) + MARGEN % POR PRODUCTO
+        col_wf, col_mp = st.columns([1.25, 1])
+
+        with col_wf:
+            st.markdown('<div class="chart-header">🌊 Cascada de Resultados Financieros (S/)</div>', unsafe_allow_html=True)
+            fig_wf = go.Figure(go.Waterfall(
+                name="P&L KCO",
+                orientation="v",
+                measure=["absolute", "relative", "relative", "subtotal", "relative", "total"],
+                x=["Venta Bruta", "Costo Proveedor", "Devoluciones", "Margen Fruta", "Gastos Op.", "Utilidad Neta"],
+                textposition="outside",
+                text=[
+                    f"<b>S/ {venta_bruta:,.0f}</b>",
+                    f"<b>-S/ {costo_mercaderia:,.0f}</b>",
+                    f"<b>-S/ {impacto_devoluciones:,.0f}</b>",
+                    f"<b>S/ {utilidad_bruta_fruta:,.0f}</b>",
+                    f"<b>-S/ {gastos_operativos:,.0f}</b>",
+                    f"<b>S/ {utilidad_neta:,.0f}</b>"
+                ],
+                textfont=dict(size=8.5, family="Arial"),
+                y=[venta_bruta, -costo_mercaderia, -impacto_devoluciones, 0, -gastos_operativos, 0],
+                connector={"line": {"color": "#94a3b8", "width": 1, "dash": "dot"}},
+                increasing={"marker": {"color": "#10b981"}},
+                decreasing={"marker": {"color": "#ef4444"}},
+                totals={"marker": {"color": COLOR_PRIMARY}}
+            ))
+            fig_wf.update_layout(
+                autosize=True,
+                template='plotly_white',
+                height=245,
+                showlegend=False,
+                yaxis=dict(title='Soles (S/)', titlefont=dict(size=9), tickfont=dict(size=8.5)),
+                xaxis=dict(tickfont=dict(size=8.5)),
+                margin=dict(t=22, b=20, l=8, r=8)
+            )
+            st.plotly_chart(fig_wf, use_container_width=True, config=PLOTLY_CONFIG)
+
+        with col_mp:
+            st.markdown('<div class="chart-header">🏷️ Margen Bruto % por Producto</div>', unsafe_allow_html=True)
+            df_rent_v = df.groupby('DESCRIPCION_PRODUCTO').agg(
+                KG_VENTA=('KILOS_SOLICITADOS', 'sum'),
+                JABAS=('JABAS_EST', 'sum'),
+                VENTA=('VALOR_COMERCIAL', 'sum'),
+                COSTO=('INVERSION_COMPRA', 'sum')
+            ).reset_index()
+
+            df_rent_d = df_dev.groupby('DESCRIPCION_PRODUCTO').agg(
+                COSTO_DEV=('COSTO_DEVOLUCION', 'sum')
+            ).reset_index() if not df_dev.empty else pd.DataFrame(columns=['DESCRIPCION_PRODUCTO', 'COSTO_DEV'])
+
+            df_rent = pd.merge(df_rent_v, df_rent_d, on='DESCRIPCION_PRODUCTO', how='left').fillna({'COSTO_DEV': 0.0})
+            df_rent['UTILIDAD'] = df_rent['VENTA'] - df_rent['COSTO'] - df_rent['COSTO_DEV']
+            df_rent['MARGEN_PCT'] = np.where(df_rent['VENTA'] > 0, (df_rent['UTILIDAD'] / df_rent['VENTA']) * 100, 0.0)
+            df_rent['PRECIO_PROM'] = np.where(df_rent['KG_VENTA'] > 0, df_rent['VENTA'] / df_rent['KG_VENTA'], 0.0)
+            df_rent['COSTO_PROM'] = np.where(df_rent['KG_VENTA'] > 0, df_rent['COSTO'] / df_rent['KG_VENTA'], 0.0)
+            df_rent = df_rent.sort_values('MARGEN_PCT', ascending=True)
+
+            fig_mp = go.Figure(go.Bar(
+                x=df_rent['MARGEN_PCT'],
+                y=df_rent['DESCRIPCION_PRODUCTO'],
+                orientation='h',
+                marker_color=[VARIEDAD_COLORS.get(p, COLOR_PRIMARY) for p in df_rent['DESCRIPCION_PRODUCTO']],
+                text=df_rent.apply(lambda r: f"<b>{r['MARGEN_PCT']:.1f}%</b> (S/ {r['UTILIDAD']:,.0f})", axis=1),
+                textposition='outside',
+                cliponaxis=False,
+                textfont=dict(size=8.5, color='#0f172a')
+            ))
+            fig_mp.update_layout(
+                autosize=True,
+                template='plotly_white',
+                height=245,
+                xaxis=dict(title='Margen %', titlefont=dict(size=9), tickfont=dict(size=8.5)),
+                yaxis=dict(title='', tickfont=dict(size=8.5)),
+                margin=dict(t=22, b=20, l=8, r=85)
+            )
+            st.plotly_chart(fig_mp, use_container_width=True, config=PLOTLY_CONFIG)
+
+        # 2. FILA INFERIOR: EVOLUTIVO DEL MARGEN + TABLA DE RENTABILIDAD POR PRODUCTO
+        col_ev, col_tbl = st.columns([1.15, 1.35])
+
+        with col_ev:
+            st.markdown(f'<div class="chart-header">📈 Evolutivo del Margen ({label_periodo})</div>', unsafe_allow_html=True)
+            ev_v = df.groupby(col_periodo).agg(VENTA=('VALOR_COMERCIAL', 'sum'), COSTO=('INVERSION_COMPRA', 'sum')).reset_index()
+            ev_d = df_dev.groupby(col_periodo).agg(COSTO_DEV=('COSTO_DEVOLUCION', 'sum')).reset_index() if not df_dev.empty else pd.DataFrame(columns=[col_periodo, 'COSTO_DEV'])
+            ev_g = df_gastos_filtered.groupby(col_periodo).agg(GASTO=('MONTO', 'sum')).reset_index() if not df_gastos_filtered.empty else pd.DataFrame(columns=[col_periodo, 'GASTO'])
+
+            df_ev_m = ev_v.merge(ev_d, on=col_periodo, how='left').merge(ev_g, on=col_periodo, how='left').fillna(0.0).sort_values(col_periodo)
+            df_ev_m['UTILIDAD_NETA'] = df_ev_m['VENTA'] - df_ev_m['COSTO'] - df_ev_m['COSTO_DEV'] - df_ev_m['GASTO']
+            df_ev_m['MARGEN_PCT'] = np.where(df_ev_m['VENTA'] > 0, (df_ev_m['UTILIDAD_NETA'] / df_ev_m['VENTA']) * 100, 0.0)
+
+            fig_ev = go.Figure()
+            fig_ev.add_trace(go.Bar(
+                x=df_ev_m[col_periodo],
+                y=df_ev_m['UTILIDAD_NETA'],
+                name='Utilidad Neta (S/)',
+                marker=dict(color=COLOR_BARRA_CLARA, line=dict(color=COLOR_BARRA_BORDE, width=1.1)),
+                text=df_ev_m['UTILIDAD_NETA'].apply(lambda x: f"<b>S/{x:,.0f}</b>"),
+                textposition='outside',
+                cliponaxis=False,
+                textfont=dict(size=8, color='#065f46'),
+                yaxis='y'
+            ))
+            fig_ev.add_trace(go.Scatter(
+                x=df_ev_m[col_periodo],
+                y=df_ev_m['MARGEN_PCT'],
+                name='Margen Neto %',
+                mode='lines+markers+text',
+                text=df_ev_m['MARGEN_PCT'].apply(lambda x: f"{x:.1f}%"),
+                textposition='top center',
+                textfont=dict(size=8, color='#9a3412'),
+                line=dict(color=COLOR_ACCENT, width=2.4),
+                marker=dict(size=6, color=COLOR_ACCENT),
+                yaxis='y2'
+            ))
+            fig_ev.update_layout(
+                autosize=True,
+                template='plotly_white',
+                height=230,
+                xaxis=dict(title='', tickangle=-30 if periodo_seleccionado == "Semanal" else 0, tickfont=dict(size=8.5)),
+                yaxis=dict(title='Utilidad (S/)', showgrid=False, titlefont=dict(size=9), tickfont=dict(size=8)),
+                yaxis2=dict(title='Margen %', overlaying='y', side='right', showgrid=True, titlefont=dict(size=9), tickfont=dict(size=8)),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=8.5)),
+                margin=dict(t=22, b=25, l=8, r=8)
+            )
+            st.plotly_chart(fig_ev, use_container_width=True, config=PLOTLY_CONFIG)
+
+        with col_tbl:
+            st.markdown('<div class="chart-header">📋 Tabla de Rentabilidad por Producto</div>', unsafe_allow_html=True)
+            df_rent_tbl = df_rent.sort_values('UTILIDAD', ascending=False)[
+                ['DESCRIPCION_PRODUCTO', 'KG_VENTA', 'PRECIO_PROM', 'COSTO_PROM', 'VENTA', 'COSTO', 'COSTO_DEV', 'UTILIDAD', 'MARGEN_PCT']
+            ].copy()
+            df_rent_tbl.columns = ['Producto', 'Kilos', 'P. Venta', 'C. Compra', 'Venta (S/)', 'Costo (S/)', 'Dev. (S/)', 'Utilidad (S/)', 'Margen %']
+            st.dataframe(
+                df_rent_tbl.style.format({
+                    'Kilos': '{:,.0f}',
+                    'P. Venta': 'S/ {:.2f}',
+                    'C. Compra': 'S/ {:.2f}',
+                    'Venta (S/)': 'S/ {:,.0f}',
+                    'Costo (S/)': 'S/ {:,.0f}',
+                    'Dev. (S/)': 'S/ {:,.0f}',
+                    'Utilidad (S/)': 'S/ {:,.0f}',
+                    'Margen %': '{:.1f}%'
+                }).map(style_margin_pct, subset=['Margen %']),
+                use_container_width=True, height=230, hide_index=True
+            )
+
+        # INSIGHT FINANCIERO EJECUTIVO
+        top_rent = df_rent.sort_values('UTILIDAD', ascending=False).iloc[0]
+        mejor_pct = df_rent.sort_values('MARGEN_PCT', ascending=False).iloc[0]
+        st.markdown(f"""
+            <div class="chart-insight">
+                <div class="insight-title">💡 Diagnóstico Financiero & Rentabilidad:</div>
+                • <b>Generador Principal de Caja:</b> <b>{top_rent['DESCRIPCION_PRODUCTO']}</b> aporta la mayor utilidad absoluta con <b>S/ {top_rent['UTILIDAD']:,.2f}</b>, mientras que <b>{mejor_pct['DESCRIPCION_PRODUCTO']}</b> logra el mayor margen porcentual (<b>{mejor_pct['MARGEN_PCT']:.1f}%</b>).<br>
+                • <b>Estructura de Costos y Gastos:</b> El costo directo de fruta absorbe el <b>{(costo_mercaderia/venta_bruta*100 if venta_bruta>0 else 0):.1f}%</b> de la venta, las devoluciones representan <b>S/ {impacto_devoluciones:,.2f}</b> y los gastos operativos de <code>factGastos</code> suman <b>S/ {gastos_operativos:,.2f}</b>, dejando un margen neto consolidado de <b>{margen_neto_pct:.1f}%</b>.
+            </div>
+        """, unsafe_allow_html=True)
+
+        # EXPANDER CON DESGLOSE DE GASTOS OPERATIVOS (factGastos)
+        with st.expander("🧾 Ver detalle de Gastos Operativos (factGastos)", expanded=False):
+            if df_gastos_filtered.empty:
+                st.info("No hay gastos operativos registrados en factGastos para el periodo filtrado.")
+            else:
+                g_show = df_gastos_filtered.sort_values('FECHA_GASTO', ascending=False)[['FECHA_GASTO', 'TIPO_GASTO', 'DESCRIPCION', 'MONTO']].copy()
+                g_show['FECHA_GASTO'] = g_show['FECHA_GASTO'].dt.strftime('%d/%m/%Y')
+                g_show.columns = ['Fecha', 'Tipo de Gasto', 'Descripción', 'Monto (S/)']
+                st.dataframe(
+                    g_show.style.format({'Monto (S/)': 'S/ {:,.2f}'}),
+                    use_container_width=True, height=200, hide_index=True
+                )
